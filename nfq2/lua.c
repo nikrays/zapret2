@@ -2322,27 +2322,36 @@ static bool lua_init_scripts(void)
 
 static void lua_sec_harden(void)
 {
+	LUA_STACK_GUARD_ENTER(params.L)
+
 	// remove unwanted functions. lua scripts are not intended to execute files
 	const struct
 	{
-		const char *global, *func;
+		const char *global, *field, *field2;
 	} bad[] = {
-		{"os","execute"},
-		{"io","popen"},
-		{"package","loadlib"},
-		{"debug", NULL}
+		{"os","execute",NULL},
+		{"io","popen",NULL},
+		{"package","loadlib",NULL},
+		{"debug", NULL, NULL},
+		{"package", "loaded", "debug"}
 	};
 	DLOG("LUA REMOVE:");
 	for (int i=0;i<sizeof(bad)/sizeof(*bad);i++)
 	{
-		if (bad[i].func)
+		if (bad[i].field)
 		{
 			lua_getglobal(params.L, bad[i].global);
-			lua_pushstring(params.L, bad[i].func);
+			if (bad[i].field2)
+			{
+				lua_getfield(params.L, -1, bad[i].field);
+				lua_pushstring(params.L, bad[i].field2);
+			}
+			else
+				lua_pushstring(params.L, bad[i].field);
 			lua_pushnil(params.L);
 			lua_rawset(params.L, -3);
-			lua_pop(params.L,1);
-			DLOG(" %s.%s", bad[i].global, bad[i].func);
+			lua_pop(params.L,1 + !!bad[i].field2);
+			DLOG(" %s.%s", bad[i].global, bad[i].field);
 		}
 		else
 		{
@@ -2352,10 +2361,14 @@ static void lua_sec_harden(void)
 		}
 	}
 	DLOG("\n");
+
+	LUA_STACK_GUARD_LEAVE(params.L,0)
 }
 
 static void lua_init_blobs(void)
 {
+	LUA_STACK_GUARD_ENTER(params.L)
+
 	struct blob_item *blob;
 	// save some memory - destroy C blobs as they are not needed anymore
 	while ((blob = LIST_FIRST(&params.blobs)))
@@ -2366,10 +2379,14 @@ static void lua_init_blobs(void)
 		lua_setglobal(params.L, blob->name);
 		blob_destroy(blob);
 	}
+
+	LUA_STACK_GUARD_LEAVE(params.L, 0)
 }
 
 static void lua_init_const(void)
 {
+	LUA_STACK_GUARD_ENTER(params.L)
+
 	const struct
 	{
 		const char *name;
@@ -2470,10 +2487,14 @@ static void lua_init_const(void)
 	}
 
 	DLOG("\n");
+
+	LUA_STACK_GUARD_LEAVE(params.L, 0)
 }
 
 static void lua_init_functions(void)
 {
+	LUA_STACK_GUARD_ENTER(params.L)
+
 	const struct
 	{
 		const char *name;
@@ -2575,6 +2596,8 @@ static void lua_init_functions(void)
 	};
 	for(int i=0;i<(sizeof(lfunc)/sizeof(*lfunc));i++)
 		lua_register(params.L,lfunc[i].name,lfunc[i].f);
+
+	LUA_STACK_GUARD_LEAVE(params.L, 0)
 }
 
 bool lua_init(void)
