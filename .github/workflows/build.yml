@@ -550,7 +550,8 @@ jobs:
           zip -qr ${{ env.repo_dir }}.zip ${{ env.repo_dir }}
           (
             cd ${{ env.repo_dir }}
-            rm -rf init.d/{openrc,pfsense,runit,s6,systemd} \
+            rm -rf binaries/{android*,freebsd*,win*} \
+                   init.d/{openrc,pfsense,runit,s6,systemd} \
                    nfq2 ip2net mdig docs Makefile
           )
           tar --owner=0 --group=0 -czf ${{ env.repo_dir }}-openwrt-embedded.tar.gz ${{ env.repo_dir }}
