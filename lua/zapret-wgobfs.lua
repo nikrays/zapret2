@@ -11,15 +11,14 @@ function wgobfs(ctx, desync)
 	local padmin = desync.arg.padmin and tonumber(desync.arg.padmin) or 0
 	local padmax = desync.arg.padmax and tonumber(desync.arg.padmax) or 16
 	local function genkey()
-		-- cache key in lua_state of conntrack is present
-		if desync.track and desync.track.lua_state.wgobfs_key then
-			key = desync.track.lua_state.wgobfs_key
+		-- cache key in a global var bound to instance name
+		local key_cache_name = desync.func_instance.."_key"
+		if _G[key_cache_name] then
+			key = _G[key_cache_name]
 		end
 		if not key then
 			key = hkdf("sha256", "wgobfs_salt", desync.arg.secret, nil, 16)
-			if desync.track then
-				desync.track.lua_state.wgobfs_key = key
-			end
+			_G[key_cache_name] = key
 		end
 		return key
 	end
