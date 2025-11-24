@@ -672,13 +672,16 @@ static bool set_low_appdata_env()
 	if (SUCCEEDED(hr))
 	{
 		size_t l = cygwin_conv_path(CCP_WIN_W_TO_POSIX | CCP_ABSOLUTE, pszPath, NULL, 0);
-		char *buf = (char*)malloc(l);
+		char *buf = (char*)malloc(l+8);
 		if (buf)
 		{
 			if (!cygwin_conv_path(CCP_WIN_W_TO_POSIX | CCP_ABSOLUTE, pszPath, buf, l))
 			{
 				b = true;
 				setenv("APPDATALOW", buf, 1);
+				memcpy(buf+l-1,"/zapret2",9);
+				setenv("WRITEABLE", buf, 1);
+				mkdir(buf,0755);
 			}
 			free(buf);
 		}
