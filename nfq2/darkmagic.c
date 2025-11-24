@@ -23,6 +23,9 @@
 #include <wlanapi.h>
 #include <netlistmgr.h>
 #include <aclapi.h>
+#include <wchar.h>
+#include <KnownFolders.h>
+#include <shlobj.h>
 
 #ifndef ERROR_INVALID_IMAGE_HASH
 #define ERROR_INVALID_IMAGE_HASH __MSABI_LONG(577)
@@ -659,8 +662,34 @@ bool ensure_file_access(const char *filename)
 	return SetMandatoryLabelFile(filename, SECURITY_MANDATORY_LOW_RID);
 }
 
-#define WINDIVERT_DEVICE_NAME "WinDivert"
+static bool set_low_appdata_env()
+{
+	bool b = false;
+	PWSTR pszPath = NULL;
+	HRESULT hr = SHGetKnownFolderPath(&FOLDERID_LocalAppDataLow, 0, NULL, &pszPath);
+	if (SUCCEEDED(hr))
+	{
+		size_t k,l = wcslen(pszPath);
+		// make it cygwin compatible
+		for (k=0 ; k<l ; k++) if (pszPath[k]==L'\\') pszPath[k]=L'/';
+		// max size of utf-8 char is 4 bytes
+		l = l*4 + 1;
+		char *buf = (char*)malloc(l);
+		if (buf)
+		{
+			if (WideCharToMultiByte(CP_UTF8, 0, pszPath, -1, buf, l, NULL, NULL))
+			{
+				b = true;
+				setenv("APPDATALOW", buf, 1);
+			}
+			free(buf);
+		}
+		CoTaskMemFree(pszPath);
+	}
+	return b;
+}
 
+#define WINDIVERT_DEVICE_NAME "WinDivert"
 static bool b_isandbox_set = false;
 bool win_sandbox(void)
 {
@@ -675,6 +704,8 @@ bool win_sandbox(void)
 			return FALSE;
 		if (!LowMandatoryLevel())
 			return false;
+		// for LUA code to find where to store files
+		set_low_appdata_env();
 		b_isandbox_set = true;
 	}
 	return true;
