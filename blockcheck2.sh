@@ -831,7 +831,7 @@ pktws_ipt_prepare()
 			opf_prepare_dvtws $1 $2 "$3"
 			;;
 		windivert)
-			WF="--wf-l3=ipv${IPV} --wf-${1}=$2"
+			WF="--wf-l3=ipv${IPV} --wf-${1}-out=$2"
 			rm -f "$IPSET_FILE"
 			for ip in $3; do
 				echo $ip >>"$IPSET_FILE"
