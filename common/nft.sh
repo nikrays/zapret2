@@ -34,6 +34,11 @@ nft_flush_set()
 	# $1 - set name
 	nft flush set inet $ZAPRET_NFT_TABLE $1
 }
+nft_flush_chain()
+{
+	# $1 - set name
+	nft flush chain inet $ZAPRET_NFT_TABLE $1
+}
 nft_set_exists()
 {
 	# $1 - set name
@@ -43,6 +48,25 @@ nft_flush_chain()
 {
 	# $1 - chain name
 	nft flush chain inet $ZAPRET_NFT_TABLE $1
+}
+nft_chain_empty()
+{
+	# $1 - chain name
+	local count=$(nft list chain inet $ZAPRET_NFT_TABLE prerouting | wc -l)
+	[ "$count" -le 4 ]
+}
+nft_rule_exists()
+{
+	# $1 - chain
+	# $2 - rule
+	local rule
+	# convert rule to nft output form
+	nft_flush_chain ruletest
+	nft_add_rule ruletest "$2"
+	rule=$(nft list chain inet $ZAPRET_NFT_TABLE ruletest | sed -n '3s/\t//gp')
+	nft_flush_chain ruletest
+	local yes=$(nft list chain inet $ZAPRET_NFT_TABLE $1 | sed -n "s/^[\t]*$rule\$/1/p")
+	[ -n "$yes" ]
 }
 
 nft_del_all_chains_from_table()
@@ -68,10 +92,40 @@ nft_del_all_chains_from_table()
 	done
 }
 
+# ipset checks cost some CPU. do not populate jump from hook until something is added to the chain
+nft_activate_chain4()
+{
+	# $1 - chain name
+	# $2 - saddr/daddr
+	local b rule
+	[ "$DISABLE_IPV4" = "1" ] || {
+		b=0
+		nft_wanif_filter_present && b=1
+
+		rule="meta mark and $DESYNC_MARK == 0"
+		[ $b = 1 ] && rule="$rule oifname @wanif"
+		rule="$rule ip $2 != @nozapret jump $1"
+		nft_rule_exists ${1}_hook "$rule" || nft_add_rule ${1}_hook $rule
+	}
+}
+nft_activate_chain6()
+{
+	# $1 - chain name
+	# $2 - saddr/daddr
+	local b rule
+	[ "$DISABLE_IPV6" = "1" ] || {
+		b=0
+		nft_wanif6_filter_present && b=1
+
+		rule="meta mark and $DESYNC_MARK == 0"
+		[ $b = 1 ] && rule="$rule oifname @wanif6"
+		rule="$rule ip6 $2 != @nozapret6 jump $1"
+		nft_rule_exists ${1}_hook "$rule" || nft_add_rule ${1}_hook $rule
+	}
+}
+
 nft_create_chains()
 {
-	local b rule
-
 cat << EOF | nft -f -
 	add chain inet $ZAPRET_NFT_TABLE forward_hook { type filter hook forward priority -1; }
 	flush chain inet $ZAPRET_NFT_TABLE forward_hook
@@ -116,6 +170,8 @@ cat << EOF | nft -f -
 	add set inet $ZAPRET_NFT_TABLE wanif { type ifname; }
 	add set inet $ZAPRET_NFT_TABLE wanif6 { type ifname; }
 
+	add chain inet $ZAPRET_NFT_TABLE ruletest
+	flush chain inet $ZAPRET_NFT_TABLE ruletest
 EOF
 	[ -n "$POSTNAT_ALL" ] && {
 		nft_flush_chain predefrag_nfqws
@@ -135,39 +191,6 @@ EOF
 			nft_add_rule prerouting_hook icmpv6 type time-exceeded ct mark and $DESYNC_MARK != 0 drop comment \"nfqws related : prevent ttl expired socket errors\"
 		}
 	}
-	[ "$DISABLE_IPV4" = "1" ] || {
-		b=0
-		nft_wanif_filter_present && b=1
-
-		rule="mark and $DESYNC_MARK == 0"
-		[ $b = 1 ] && rule="$rule oifname @wanif"
-		rule="$rule ip daddr != @nozapret"
-		nft_add_rule postrouting_hook $rule jump postrouting
-		nft_add_rule postnat_hook $rule jump postnat
-
-		rule="mark and $DESYNC_MARK == 0"
-		[ $b = 1 ] && rule="$rule iifname @wanif"
-		rule="$rule ip daddr != @nozapret"
-		nft_add_rule prerouting_hook $rule jump prerouting
-		nft_add_rule prenat_hook $rule jump prenat
-	}
-	[ "$DISABLE_IPV6" = "1" ] || {
-		b=0
-		nft_wanif6_filter_present && b=1
-
-		rule="mark and $DESYNC_MARK == 0"
-		[ $b = 1 ] && rule="$rule oifname @wanif6"
-		rule="$rule ip6 daddr != @nozapret6"
-		nft_add_rule postrouting_hook $rule jump postrouting
-		nft_add_rule postnat_hook $rule jump postnat
-
-		rule="mark and $DESYNC_MARK == 0"
-		[ $b = 1 ] && rule="$rule iifname @wanif6"
-		rule="$rule ip6 daddr != @nozapret6"
-		nft_add_rule prerouting_hook $rule jump prerouting
-		nft_add_rule prenat_hook $rule jump prenat
-	}
-
 }
 nft_del_chains()
 {
@@ -189,6 +212,7 @@ cat << EOF | nft -f - 2>/dev/null
 	delete chain inet $ZAPRET_NFT_TABLE flow_offload
 	delete chain inet $ZAPRET_NFT_TABLE flow_offload_zapret
 	delete chain inet $ZAPRET_NFT_TABLE flow_offload_always
+	delete chain inet $ZAPRET_NFT_TABLE ruletest
 EOF
 # unfortunately this approach breaks udp desync of the connection initiating packet (new, first one)
 #	delete chain inet $ZAPRET_NFT_TABLE predefrag
@@ -447,6 +471,7 @@ _nft_fw_nfqws_post4()
 		is_postnat && setmark="meta mark set meta mark or $DESYNC_MARK_POSTNAT"
 		nft_insert_rule $chain $rule $setmark $CONNMARKER $FW_EXTRA_POST queue num $port bypass
 		nft_add_nfqws_flow_exempt_rule "$rule"
+		nft_activate_chain4 $chain daddr
 	}
 }
 _nft_fw_nfqws_post6()
@@ -462,6 +487,7 @@ _nft_fw_nfqws_post6()
 		is_postnat && setmark="meta mark set meta mark or $DESYNC_MARK_POSTNAT"
 		nft_insert_rule $chain $rule $setmark $CONNMARKER $FW_EXTRA_POST queue num $port bypass
 		nft_add_nfqws_flow_exempt_rule "$rule"
+		nft_activate_chain6 $chain daddr
 	}
 }
 nft_fw_nfqws_post()
@@ -481,10 +507,11 @@ _nft_fw_nfqws_pre4()
 	# $3 - not-empty if wan interface filtering required
 
 	[ "$DISABLE_IPV4" = "1" -o -z "$1" ] || {
-		local filter="$1" port="$2" rule
+		local filter="$1" port="$2" rule chain=$(get_prechain)
 		nft_print_op "$filter" "nfqws prerouting (qnum $port)" 4
 		rule="meta nfproto ipv4 $filter"
-		nft_insert_rule $(get_prechain) $rule $CONNMARKER $FW_EXTRA_POST queue num $port bypass
+		nft_insert_rule $chain $rule $CONNMARKER $FW_EXTRA_POST queue num $port bypass
+		nft_activate_chain4 $chain saddr
 	}
 }
 _nft_fw_nfqws_pre6()
@@ -494,10 +521,11 @@ _nft_fw_nfqws_pre6()
 	# $3 - not-empty if wan interface filtering required
 
 	[ "$DISABLE_IPV6" = "1" -o -z "$1" ] || {
-		local filter="$1" port="$2" rule
+		local filter="$1" port="$2" rule chain=$(get_prechain)
 		nft_print_op "$filter" "nfqws prerouting (qnum $port)" 6
 		rule="meta nfproto ipv6 $filter"
-		nft_insert_rule $(get_prechain) $rule $CONNMARKER $FW_EXTRA_POST queue num $port bypass
+		nft_insert_rule $chain $rule $CONNMARKER $FW_EXTRA_POST queue num $port bypass
+		nft_activate_chain6 $chain saddr
 	}
 }
 nft_fw_nfqws_pre()
