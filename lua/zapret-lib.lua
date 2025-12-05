@@ -85,7 +85,7 @@ function apply_execution_plan(desync, plan)
 	desync.arg = deepcopy(plan.arg)
 	apply_arg_prefix(desync.arg)
 end
--- produce resulting verdict from 2 verdict
+-- produce resulting verdict from 2 verdicts
 function verdict_aggregate(v1, v2)
 	local v
 	v1 = v1 or VERDICT_PASS
@@ -142,7 +142,7 @@ function pos_get(desync, mode)
 		elseif mode=='b' then
 			return desync.outgoing and desync.track.pbcounter_orig or desync.track.pbcounter_reply
 		elseif mode=='s' and desync.track.tcp then
-			return desync.outgoing and (desync.track.tcp.seq - desync.track.tcp.seq0) or (desync.track.tcp.ack - desync.track.tcp.ack0)
+			return desync.outgoing and u32add(desync.track.tcp.seq, -desync.track.tcp.seq0) or u32add(desync.track.tcp.ack, -desync.track.tcp.ack0)
 		end
 	end
 	return 0
@@ -1030,6 +1030,11 @@ function genhost(len, template)
 			return brandom_az(1)..brandom_az09(len-1)
 		end
 	end
+end
+
+-- return hostname if present or ip address in text form otherwise
+function host_or_ip(desync)
+	return desync.hostname or (desync.dis.ip and ntop(desync.dis.ip) or desync.dis.ip6 and ntop(desync.dis.ip6))
 end
 
 function is_absolute_path(path)

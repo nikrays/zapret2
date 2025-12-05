@@ -299,8 +299,32 @@ function test_bit()
 	test_assert(v2==v3)
 end
 
+function test_ux()
+	local v1, v2, v3, usum, sum
+	for k,test in pairs({
+		{ add=u8add, fname="u8add", max = 0xFF },
+		{ add=u16add, fname="u16add", max = 0xFFFF },
+		{ add=u24add, fname="u24add", max = 0xFFFFFF },
+		{ add=u32add, fname="u32add", max = 0xFFFFFFFF }
+	}) do
+		io.write(test.fname.." : ")
+		for i=1,1000 do
+			v1=math.random(-test.max,test.max)
+			v2=math.random(-test.max,test.max)
+			v3=math.random(-test.max,test.max)
+			usum = test.add(v1,v2,v3)
+			sum = bitand(v1+v2+v3,test.max)
+			if sum~=usum then
+				print("FAIL")
+			end
+			test_assert(sum==usum)
+		end
+		print("OK")
+	end
+end
+
 function test_bin(...)
-	test_run({test_ub, test_bit},...)
+	test_run({test_ub, test_bit, test_ux},...)
 end
 
 

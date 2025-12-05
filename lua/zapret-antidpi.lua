@@ -290,7 +290,7 @@ end
 -- nfqws1 : "--dpi-desync=syndata"
 -- standard args : fooling, rawsend, reconstruct, ipfrag
 -- arg : blob=<blob> - fake payload. must fit to single packet. no segmentation possible. default - 16 zero bytes.
--- arg : tls_mod=<list> - comma separated list of tls mods : rnd,rndsni,sni=<str>,dupsid,padencap
+-- arg : tls_mod=<list> - comma separated list of tls mods : rnd,rndsni,sni=<str>
 function syndata(ctx, desync)
 	if desync.dis.tcp then
 		if bitand(desync.dis.tcp.th_flags, TH_SYN + TH_ACK)==TH_SYN then
