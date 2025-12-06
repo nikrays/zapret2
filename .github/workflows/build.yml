@@ -108,7 +108,7 @@ jobs:
           export PKG_CONFIG_PATH=$DEPS_DIR/lib/pkgconfig
           export STAGING_DIR=$RUNNER_TEMP
 
-          if [[ "$ARCH" == lexra ]] || [[ "$ARCH" == ppc ]]; then
+          if [[ "$ARCH" == lexra ]] || [[ "$ARCH" == ppc ]] || [[ "$ARCH" == x86 ]]; then
             # use classic lua
             wget -qO- https://www.lua.org/ftp/lua-${LUA_RELEASE}.tar.gz | tar -xz
             (

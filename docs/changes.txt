@@ -57,6 +57,7 @@ v0.5
 * nfqws2: abandon any arithmetics beyond 32bit (because lua 5.1 does not support 64 bit integers, store everything as double)
 * nfqws2: fix issues with 32-bit lua_Integer in lua<5.3 on 32-bit platforms
 * nfqws2: instance_cutoff luacall just warns and do nothing if ctx is nil
+* actions: build nfqws2 x86 binary with LUA 5.4, not with luajit
 * zapret-lib: http_reply, url and nld dissectors
 * zapret-lib: instance_cutoff_shim
 * zapret-auto: circular orchestrator
