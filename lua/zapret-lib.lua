@@ -571,17 +571,6 @@ function dissect_nld(domain, level)
 	end
 	return nil
 end
--- location is url compatible with Location: header
--- hostname is original hostname
-function is_dpi_redirect(hostname, location)
-	local ds = dissect_url(location)
-	if ds.domain then
-		local sld1 = dissect_nld(hostname,2)
-		local sld2 = dissect_nld(ds.domain,2)
-		return sld2 and sld1~=sld2
-	end
-	return false
-end
 
 -- support sni=%var
 function tls_mod_shim(desync, blob, modlist, payload)
