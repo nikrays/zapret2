@@ -69,8 +69,65 @@ function is_dpi_redirect(hostname, location)
 	return false
 end
 
+-- standard failure detector
+-- works with tcp only
+-- detected failures:
+--   incoming RST (within `options.seq_rst`)
+--   incoming http redirection (if no 'options.no_http_redirect')
+--   outgoing retransmissions (`options.retrans` threshold)
+-- stops dectecting after seq 'options.maxseq'
+function standard_failure_detector(desync, crec, options)
+	if not desync.dis.tcp or crec.nocheck then return false end
+	local seq = pos_get(desync,'s')
+	if options.maxseq and seq>options.maxseq then
+		DLOG("standard_failure_detector: s"..seq.." is beyond s"..options.maxseq..". treating connection as successful")
+		crec.nocheck = true
+		return false
+	end
+
+	local trigger = false
+	local seq = pos_get(desync,'s')
+	if desync.outgoing then
+		if #desync.dis.payload>0 and options.retrans and (crec.retrans or 0)<options.retrans then
+			if not crec.uppos then crec.uppos=0 end
+			if desync.track.tcp.pos_orig<=crec.uppos then
+				crec.retrans = crec.retrans and (crec.retrans+1) or 1
+				DLOG("standard_failure_detector: retransmission "..crec.retrans.."/"..options.retrans)
+				trigger = crec.retrans>=options.retrans
+			end
+			if desync.track.tcp.pos_orig>crec.uppos then
+				crec.uppos=desync.track.tcp.pos_orig
+			end
+		end
+	else
+		if options.seq_rst and bitand(desync.dis.tcp.th_flags, TH_RST)~=0 then
+			trigger = seq<=options.seq_rst
+			if b_debug then
+				if trigger then
+					DLOG("standard_failure_detector: incoming RST s"..seq.." in range s"..options.seq_rst)
+				else
+					DLOG("standard_failure_detector: not counting incoming RST s"..seq.." beyond s"..options.seq_rst)
+				end
+			end
+		elseif not options.no_http_redirect and desync.l7payload=="http_reply" and desync.track.hostname then
+			local hdis = http_dissect_reply(desync.dis.payload)
+			if hdis and (hdis.code==302 or hdis.code==307) and hdis.headers.location and hdis.headers.location then
+				trigger = is_dpi_redirect(desync.track.hostname, hdis.headers.location.value)
+				if b_debug then
+					if trigger then
+						DLOG("standard_failure_detector: http redirect "..hdis.code.." to '"..hdis.headers.location.value.."'. looks like DPI redirect.")
+					else
+						DLOG("standard_failure_detector: http redirect "..hdis.code.." to '"..hdis.headers.location.value.."'. NOT a DPI redirect.")
+					end
+				end
+			end
+		end
+	end
+	return trigger
+end
+
 -- circularily change strategy numbers when failure count reaches threshold ('fails')
--- detected failures: incoming RST, incoming http redirection, outgoing retransmissions
+-- works with tcp only
 -- this orchestrator requires redirection of incoming traffic to cache RST and http replies !
 -- each orchestrated instance must have strategy=N arg, where N starts from 1 and increment without gaps
 -- if 'final' arg is present in an orchestrated instance it stops rotation
@@ -80,6 +137,7 @@ end
 -- arg: rst=<rseq> - maximum relative sequence number to treat incoming RST as DPI reset. default is 1
 -- arg: time=<sec> - if last failure happened earlier than `maxtime` seconds ago - reset failure counter. default is 60.
 -- arg: reqhost - pass with no tampering if hostname is unavailable
+-- arg: detector - failure detector function name
 -- test case: nfqws2 --qnum 200 --debug --lua-init=@zapret-lib.lua --lua-init=@zapret-auto.lua --in-range=-s1 --lua-desync=circular --lua-desync=argdebug:strategy=1 --lua-desync=argdebug:strategy=2
 function circular(ctx, desync)
 	local function count_strategies(hrec, plan)
@@ -139,63 +197,30 @@ function circular(ctx, desync)
 		error("circular: add strategy=N tag argument to each following instance ! N must start from 1 and increment")
 	end
 
-	local rstseq = tonumber(desync.arg.rst) or 1
+	local seq_rst = tonumber(desync.arg.rst) or 1
 	local maxseq = tonumber(desync.arg.seq) or 0x10000
-	local fails = tonumber(desync.arg.fails) or 3
 	local retrans = tonumber(desync.arg.retrans) or 3
+	local fails = tonumber(desync.arg.fails) or 3
 	local maxtime = tonumber(desync.arg.time) or 60
 	local crec = automate_conn_record(desync)
-	local trigger = false
+	local failure_detector
+	if desync.arg.detector then
+		if type(_G[desync.arg.detector])~="function" then
+			error("circular: invalid failure detector function '"..desync.arg.detector.."'")
+		end
+		failure_detector = _G[desync.arg.detector]
+	else
+		failure_detector = standard_failure_detector
+	end
 
 	if not hrec.nstrategy then
 		DLOG("circular: start from strategy 1")
 		hrec.nstrategy = 1
 	end
 
-	if not crec.nocheck then
-		local seq = pos_get(desync,'s')
-		if seq>maxseq then
-			DLOG("circular: s"..seq.." is beyond s"..maxseq..". treating connection as successful")
-			crec.nocheck = true
-		end
-	end
-
 	local verdict = VERDICT_PASS
-	if not crec.nocheck and hrec.final~=hrec.nstrategy then
-		if desync.outgoing then
-			if #desync.dis.payload>0 and (crec.retrans or 0)<retrans then
-				if not crec.uppos then crec.uppos=0 end
-				if desync.track.tcp.pos_orig<=crec.uppos then
-					crec.retrans = crec.retrans and (crec.retrans+1) or 1
-					DLOG("circular: retransmission "..crec.retrans.."/"..retrans)
-					trigger = crec.retrans>=retrans
-				end
-				if desync.track.tcp.pos_orig>crec.uppos then
-					crec.uppos=desync.track.tcp.pos_orig
-				end
-			end
-		else
-			if bitand(desync.dis.tcp.th_flags, TH_RST)~=0 then
-				local seq=u32add(desync.track.tcp.ack, -desync.track.tcp.ack0)
-				trigger = seq<=rstseq
-				if b_debug then
-					if trigger then
-						DLOG("circular: incoming RST s"..seq.." in range s"..rstseq)
-					else
-						DLOG("circular: not counting incoming RST s"..seq.." beyond s"..rstseq)
-					end
-				end
-			elseif desync.l7payload=="http_reply" and desync.track.hostname then
-				local hdis = http_dissect_reply(desync.dis.payload)
-				if hdis and (hdis.code==302 or hdis.code==307) and hdis.headers.location and hdis.headers.location then
-					trigger = is_dpi_redirect(desync.track.hostname, hdis.headers.location.value)
-					if trigger and b_debug then
-						DLOG("circular: http redirect "..hdis.code.." to '"..hdis.headers.location.value.."'")
-					end
-				end
-			end
-		end
-		if trigger then
+	if hrec.final~=hrec.nstrategy then
+		if failure_detector(desync,crec,{retrans=retrans,maxseq=maxseq,seq_rst=seq_rst}) then
 			if automate_failure_counter(hrec, crec, fails, maxtime) then
 				-- circular strategy change
 				hrec.nstrategy = (hrec.nstrategy % hrec.ctstrategy) + 1

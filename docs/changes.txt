@@ -61,3 +61,7 @@ v0.5
 * zapret-lib: http_reply, url and nld dissectors
 * zapret-lib: instance_cutoff_shim
 * zapret-auto: circular orchestrator
+
+v0.6
+
+* zapret-auto: separate failure detection logic
