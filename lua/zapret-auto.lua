@@ -196,21 +196,6 @@ function circular(ctx, desync)
 		error("circular: add strategy=N tag argument to each following instance ! N must start from 1 and increment")
 	end
 
-	local seq_rst = tonumber(desync.arg.rst) or 1
-	local maxseq = tonumber(desync.arg.seq) or 0x10000
-	local retrans = tonumber(desync.arg.retrans) or 3
-	local fails = tonumber(desync.arg.fails) or 3
-	local maxtime = tonumber(desync.arg.time) or 60
-	local failure_detector
-	if desync.arg.detector then
-		if type(_G[desync.arg.detector])~="function" then
-			error("circular: invalid failure detector function '"..desync.arg.detector.."'")
-		end
-		failure_detector = _G[desync.arg.detector]
-	else
-		failure_detector = standard_failure_detector
-	end
-
 	if not hrec.nstrategy then
 		DLOG("circular: start from strategy 1")
 		hrec.nstrategy = 1
@@ -219,6 +204,21 @@ function circular(ctx, desync)
 	local verdict = VERDICT_PASS
 	if hrec.final~=hrec.nstrategy then
 		local crec = automate_conn_record(desync)
+		local seq_rst = tonumber(desync.arg.rst) or 1
+		local maxseq = tonumber(desync.arg.seq) or 0x10000
+		local retrans = tonumber(desync.arg.retrans) or 3
+		local fails = tonumber(desync.arg.fails) or 3
+		local maxtime = tonumber(desync.arg.time) or 60
+		local failure_detector
+		if desync.arg.detector then
+			if type(_G[desync.arg.detector])~="function" then
+				error("circular: invalid failure detector function '"..desync.arg.detector.."'")
+			end
+			failure_detector = _G[desync.arg.detector]
+		else
+			failure_detector = standard_failure_detector
+		end
+
 		if failure_detector(desync,crec,{retrans=retrans,maxseq=maxseq,seq_rst=seq_rst}) then
 			if automate_failure_counter(hrec, crec, fails, maxtime) then
 				-- circular strategy change
