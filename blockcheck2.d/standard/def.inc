@@ -2,6 +2,6 @@ FOOLINGS46_TCP=${FOOLINGS46_TCP:-"tcp_md5 badsum tcp_seq=-3000 tcp_seq=1000000 t
 FOOLINGS6_TCP=${FOOLINGS6_TCP:-"ip6_hopbyhop ip6_hopbyhop:ip6_hopbyhop2 ip6_destopt ip6_routing ip6_ah"}
 FOOLINGS_TCP="$FOOLINGS46_TCP"
 [ "$IPV" = 6 ] && FOOLINGS_TCP="$FOOLINGS_TCP $FOOLINGS6_TCP"
-FOOLINGS_UDP="badsum"
+FOOLINGS_UDP="${FOOLINGS_UDP:-badsum"}
 
 FAKE_REPEATS=${FAKE_REPEATS:-1}
