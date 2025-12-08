@@ -70,55 +70,82 @@ function is_dpi_redirect(hostname, location)
 end
 
 -- standard failure detector
--- works with tcp only
+-- works with tcp and udp
 -- detected failures:
 --   incoming RST (within `options.seq_rst`)
 --   incoming http redirection (if no 'options.no_http_redirect')
 --   outgoing retransmissions (`options.retrans` threshold)
+--   udp : >= `options.udp_out` outgoings with <= 'options.udp_in' incomings
 -- stops dectecting after seq 'options.maxseq'
 function standard_failure_detector(desync, crec, options)
-	if not desync.dis.tcp or crec.nocheck then return false end
-	local seq = pos_get(desync,'s')
-	if options.maxseq and seq>options.maxseq then
-		DLOG("standard_failure_detector: s"..seq.." is beyond s"..options.maxseq..". treating connection as successful")
-		crec.nocheck = true
-		return false
-	end
+	if crec.nocheck then return false end
 
 	local trigger = false
-	if desync.outgoing then
-		if #desync.dis.payload>0 and options.retrans and (crec.retrans or 0)<options.retrans then
-			if is_retransmission(desync) then
-				crec.retrans = crec.retrans and (crec.retrans+1) or 1
-				DLOG("standard_failure_detector: retransmission "..crec.retrans.."/"..options.retrans)
-				trigger = crec.retrans>=options.retrans
-			end
+	if desync.dis.tcp then
+		local seq = pos_get(desync,'s')
+		if options.maxseq and seq>options.maxseq then
+			DLOG("standard_failure_detector: s"..seq.." is beyond s"..options.maxseq..". treating connection as successful")
+			crec.nocheck = true
+			return false
 		end
-	else
-		if options.seq_rst and bitand(desync.dis.tcp.th_flags, TH_RST)~=0 then
-			trigger = seq<=options.seq_rst
-			if b_debug then
-				if trigger then
-					DLOG("standard_failure_detector: incoming RST s"..seq.." in range s"..options.seq_rst)
-				else
-					DLOG("standard_failure_detector: not counting incoming RST s"..seq.." beyond s"..options.seq_rst)
+
+		if desync.outgoing then
+			if #desync.dis.payload>0 and options.retrans and (crec.retrans or 0)<options.retrans then
+				if is_retransmission(desync) then
+					crec.retrans = crec.retrans and (crec.retrans+1) or 1
+					DLOG("standard_failure_detector: retransmission "..crec.retrans.."/"..options.retrans)
+					trigger = crec.retrans>=options.retrans
 				end
 			end
-		elseif not options.no_http_redirect and desync.l7payload=="http_reply" and desync.track.hostname then
-			local hdis = http_dissect_reply(desync.dis.payload)
-			if hdis and (hdis.code==302 or hdis.code==307) and hdis.headers.location and hdis.headers.location then
-				trigger = is_dpi_redirect(desync.track.hostname, hdis.headers.location.value)
+		else
+			if options.seq_rst and bitand(desync.dis.tcp.th_flags, TH_RST)~=0 then
+				trigger = seq<=options.seq_rst
 				if b_debug then
 					if trigger then
-						DLOG("standard_failure_detector: http redirect "..hdis.code.." to '"..hdis.headers.location.value.."'. looks like DPI redirect.")
+						DLOG("standard_failure_detector: incoming RST s"..seq.." in range s"..options.seq_rst)
 					else
-						DLOG("standard_failure_detector: http redirect "..hdis.code.." to '"..hdis.headers.location.value.."'. NOT a DPI redirect.")
+						DLOG("standard_failure_detector: not counting incoming RST s"..seq.." beyond s"..options.seq_rst)
+					end
+				end
+			elseif not options.no_http_redirect and desync.l7payload=="http_reply" and desync.track.hostname then
+				local hdis = http_dissect_reply(desync.dis.payload)
+				if hdis and (hdis.code==302 or hdis.code==307) and hdis.headers.location and hdis.headers.location then
+					trigger = is_dpi_redirect(desync.track.hostname, hdis.headers.location.value)
+					if b_debug then
+						if trigger then
+							DLOG("standard_failure_detector: http redirect "..hdis.code.." to '"..hdis.headers.location.value.."'. looks like DPI redirect.")
+						else
+							DLOG("standard_failure_detector: http redirect "..hdis.code.." to '"..hdis.headers.location.value.."'. NOT a DPI redirect.")
+						end
+					end
+				end
+			end
+		end
+	elseif desync.dis.udp then
+		if desync.outgoing then
+			if options.udp_out then
+				local udp_in = options.udp_in or 0
+				trigger = desync.track.pcounter_orig>=options.udp_out and desync.track.pcounter_reply<=udp_in
+				if trigger then
+					crec.nocheck = true
+					if b_debug then
+						DLOG("standard_failure_detector: udp_out "..desync.track.pcounter_orig..">="..options.udp_out.." udp_in "..desync.track.pcounter_reply.."<="..udp_in)
 					end
 				end
 			end
 		end
 	end
 	return trigger
+end
+-- prepare options table from args
+function standard_failure_detector_options(arg)
+	return {
+		seq_rst = tonumber(arg.rst) or 1,
+		retrans = tonumber(arg.retrans) or 3,
+		maxseq = tonumber(arg.seq) or 0x10000,
+		udp_in = tonumber(arg.udp_in) or 1,
+		udp_out = tonumber(arg.udp_out) or 3
+	}
 end
 
 -- circularily change strategy numbers when failure count reaches threshold ('fails')
@@ -132,7 +159,9 @@ end
 -- arg: rst=<rseq> - maximum relative sequence number to treat incoming RST as DPI reset. default is 1
 -- arg: time=<sec> - if last failure happened earlier than `maxtime` seconds ago - reset failure counter. default is 60.
 -- arg: reqhost - pass with no tampering if hostname is unavailable
--- arg: detector - failure detector function name
+-- arg: udp_out - >= outgoing udp packets. default is 3
+-- arg: udp_in - with <= incoming udp packets. default is 1
+-- arg: detector - failure detector function name. '<func_name>_options' function converts parameters from arg to options table.
 -- test case: nfqws2 --qnum 200 --debug --lua-init=@zapret-lib.lua --lua-init=@zapret-auto.lua --in-range=-s1 --lua-desync=circular --lua-desync=argdebug:strategy=1 --lua-desync=argdebug:strategy=2
 function circular(ctx, desync)
 	local function count_strategies(hrec, plan)
@@ -165,10 +194,6 @@ function circular(ctx, desync)
 	-- take over orchestration. prevent further instance execution in case of error
 	execution_plan_cancel(ctx)
 
-	if not desync.dis.tcp then
-		DLOG_ERR("circular: this orchestrator is tcp only. use filters to avoid udp traffic.")
-		return
-	end
 	if not desync.track then
 		DLOG_ERR("circular: conntrack is missing but required")
 		return
@@ -199,22 +224,20 @@ function circular(ctx, desync)
 	local verdict = VERDICT_PASS
 	if hrec.final~=hrec.nstrategy then
 		local crec = automate_conn_record(desync)
-		local seq_rst = tonumber(desync.arg.rst) or 1
-		local maxseq = tonumber(desync.arg.seq) or 0x10000
-		local retrans = tonumber(desync.arg.retrans) or 3
 		local fails = tonumber(desync.arg.fails) or 3
 		local maxtime = tonumber(desync.arg.time) or 60
-		local failure_detector
+		local failure_detector, failure_detector_getopts
 		if desync.arg.detector then
 			if type(_G[desync.arg.detector])~="function" then
 				error("circular: invalid failure detector function '"..desync.arg.detector.."'")
 			end
 			failure_detector = _G[desync.arg.detector]
+			failure_detector_getopts = _G[desync.arg.detector.."_options"] or standard_failure_detector_options
 		else
 			failure_detector = standard_failure_detector
+			failure_detector_getopts = standard_failure_detector_options
 		end
-
-		if failure_detector(desync,crec,{retrans=retrans,maxseq=maxseq,seq_rst=seq_rst}) then
+		if failure_detector(desync,crec,failure_detector_getopts(desync.arg)) then
 			if automate_failure_counter(hrec, crec, fails, maxtime) then
 				-- circular strategy change
 				hrec.nstrategy = (hrec.nstrategy % hrec.ctstrategy) + 1
