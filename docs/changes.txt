@@ -74,3 +74,7 @@ v0.6
 * nfqws2: reasm support negative overlaps. gaps are not supported.
 * nfqws2,zapret-auto: changed retransmission detection scheme.
 * zapret-auto: udp_in/udp_out failure detection
+
+v0.6.1
+
+* zapret-lib, zapret-auto: condition and stopif orchestrators

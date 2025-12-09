@@ -255,3 +255,54 @@ function circular(ctx, desync)
 
 	return verdict
 end
+
+-- test iff functions
+function cond_true(desync)
+	return true
+end
+function cond_false(desync)
+	return false
+end
+-- arg: percent - of true . 50 by default
+function cond_random(desync)
+	return math.random(0,99)<(tonumber(desync.arg.percent) or 50)
+end
+-- check iff function available. error if not
+function require_iff(desync, name)
+	if not desync.arg.iff then
+		error(name..": missing 'iff' function")
+	end
+	if type(_G[desync.arg.iff])~="function" then
+		error(name..": invalid 'iff' function '"..desync.arg.iff.."'")
+	end
+end
+-- execute further desync instances only if user-provided 'iff' function returns true
+-- for example, this can be used by custom protocol detectors
+-- arg: iff - condition function. takes desync as arg and returns bool. (cant use 'if' because of reserved word)
+-- arg: neg - invert condition function result
+function condition(ctx, desync)
+	require_iff(desync, "condition")
+	orchestrate(ctx, desync)
+	if logical_xor(_G[desync.arg.iff](desync), desync.arg.neg) then
+		DLOG("condition: true")
+		return replay_execution_plan(desync)
+	else
+		DLOG("condition: false")
+		plan_clear(desync)
+	end
+end
+-- clear execution plan if user provided 'iff' functions returns true
+-- can be used with other orchestrators to stop execution conditionally
+-- arg: iff - condition function. takes desync as arg and returns bool. (cant use 'if' because of reserved word)
+-- arg: neg - invert condition function result
+function stopif(ctx, desync)
+	require_iff(desync, "stopif")
+	orchestrate(ctx, desync)
+	if logical_xor(_G[desync.arg.iff](desync), desync.arg.neg) then
+		DLOG("stopif: true")
+		plan_clear(desync)
+	else
+		-- do not do anything. allow other orchestrator to finish the plan
+		DLOG("stopif: false")
+	end
+end

@@ -156,6 +156,9 @@ end
 function plan_instance_pop(desync)
 	return (desync.plan and #desync.plan>0) and table.remove(desync.plan, 1)
 end
+function plan_clear(desync)
+	while table.remove(desync.plan) do end
+end
 -- this approach allows nested orchestrators
 function orchestrate(ctx, desync)
 	if not desync.plan then
@@ -169,6 +172,10 @@ function desync_copy(desync)
 	if desync.track then
 		-- preserve lua state
 		dcopy.track.lua_state = desync.track.lua_state
+	end
+	if desync.plan then
+		-- preserve execution plan
+		dcopy.plan = desync.plan
 	end
 	return dcopy
 end
@@ -317,6 +324,9 @@ function str_or_hex(s)
 	else
 		return s
 	end
+end
+function logical_xor(a,b)
+	return a and not b or not a and b
 end
 -- print to DLOG any variable. tables are expanded in the tree form, unprintables strings are hex dumped
 function var_debug(v)
