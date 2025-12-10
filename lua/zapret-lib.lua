@@ -130,7 +130,8 @@ function apply_arg_prefix(desync)
 	for a,v in pairs(desync.arg) do
 		local c = string.sub(v,1,1)
 		if c=='#' then
-			desync.arg[a] = #blob(desync,string.sub(v,2))
+			local blb = blob(desync,string.sub(v,2))
+			desync.arg[a] = (type(blb)=='string' or type(blb)=='table') and #blb or 0
 		elseif c=='%' then
 			desync.arg[a] = blob(desync,string.sub(v,2))
 		elseif c=='\\' then
