@@ -2,33 +2,31 @@
 -- this is related to making dynamic strategy decisions without rewriting or altering strategy function code
 -- orchestrators can decide which instances to call or not to call or pass them dynamic arguments
 -- failure detectors test potential block conditions for orchestrators
-
 -- arg: reqhost - require hostname, do not work with ip
 -- arg: key - a string - table name inside autostate table. to allow multiple orchestrator instances to use single host storage
 function automate_host_record(desync)
-	local key
-	if desync.arg.key and #desync.arg.key>0 then
-		key = desync.arg.key
-	elseif desync.arg.reqhost then
-		key = desync.track and desync.track.hostname
+	local hostkey, askey
+	if desync.arg.reqhost then
+		hostkey = desync.track and desync.track.hostname
 	else
-		key = host_or_ip(desync)
+		hostkey = host_or_ip(desync)
 	end
-	if not key then
+	if not hostkey then
 		DLOG("automate: host record key unavailable")
 		return nil
 	end
-	DLOG("automate: host record key 'autostate."..desync.func_instance.."."..key.."'")
+	askey = (desync.arg.key and #desync.arg.key>0) and desync.arg.key or desync.func_instance
+	DLOG("automate: host record key 'autostate."..askey.."."..hostkey.."'")
 	if not autostate then
 		autostate = {}
 	end
-	if not autostate[desync.func_instance] then
-		autostate[desync.func_instance] = {}
+	if not autostate[askey] then
+		autostate[askey] = {}
 	end
-	if not autostate[desync.func_instance][key] then
-		autostate[desync.func_instance][key] = {}
+	if not autostate[askey][hostkey] then
+		autostate[askey][hostkey] = {}
 	end
-	return autostate[desync.func_instance][key]
+	return autostate[askey][hostkey]
 end
 function automate_conn_record(desync)
 	if not desync.track.lua_state.automate then
