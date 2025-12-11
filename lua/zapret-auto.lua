@@ -89,7 +89,7 @@ end
 -- arg: retrans=N - tcp: retrans count threshold. default is 3
 -- arg: rst=<rseq> - tcp: maximum relative sequence number to treat incoming RST as DPI reset. default is 1
 -- arg: no_http_redirect - tcp: disable http_reply dpi redirect trigger
--- arg: udp_out - udp: >= outgoing udp packets. default is 3
+-- arg: udp_out - udp: >= outgoing udp packets. default is 4
 -- arg: udp_in - udp: with <= incoming udp packets. default is 1
 function standard_failure_detector(desync, crec, arg)
 	if crec.nocheck then return false end
@@ -98,7 +98,7 @@ function standard_failure_detector(desync, crec, arg)
 	local retrans = tonumber(arg.retrans) or 3
 	local maxseq = tonumber(arg.seq) or 0x10000
 	local udp_in = tonumber(arg.udp_in) or 1
-	local udp_out = tonumber(arg.udp_out) or 3
+	local udp_out = tonumber(arg.udp_out) or 4
 
 	local trigger = false
 	if desync.dis.tcp then

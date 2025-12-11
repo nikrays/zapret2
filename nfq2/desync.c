@@ -323,23 +323,50 @@ static void auto_hostlist_failed(struct desync_profile *dp, const char *hostname
 		}
 	}
 }
-
+static void fill_client_ip_port(const struct sockaddr *client, char *client_ip_port, size_t client_ip_port_size)
+{
+	if (*params.hostlist_auto_debuglog)
+		ntop46_port((struct sockaddr*)client, client_ip_port, client_ip_port_size);
+	else
+		*client_ip_port = 0;
+}
 static void process_retrans_fail(t_ctrack *ctrack, uint8_t proto, const struct sockaddr *client)
 {
 	if (params.server) return; // no autohostlists in server mode
 
 	char client_ip_port[48];
-	if (*params.hostlist_auto_debuglog)
-		ntop46_port((struct sockaddr*)client, client_ip_port, sizeof(client_ip_port));
-	else
-		*client_ip_port = 0;
+	fill_client_ip_port(client, client_ip_port, sizeof(client_ip_port));
 	if (ctrack && ctrack->dp && ctrack->hostname && auto_hostlist_retrans(ctrack, proto, ctrack->dp->hostlist_auto_retrans_threshold, client_ip_port, ctrack->l7proto))
 	{
 		HOSTLIST_DEBUGLOG_APPEND("%s : profile %u (%s) : client %s : proto %s : retrans threshold reached", ctrack->hostname, ctrack->dp->n, PROFILE_NAME(ctrack->dp), client_ip_port, l7proto_str(ctrack->l7proto));
 		auto_hostlist_failed(ctrack->dp, ctrack->hostname, ctrack->hostname_is_ip, client_ip_port, ctrack->l7proto);
 	}
 }
-
+static void process_udp_fail(t_ctrack *ctrack, const t_ctrack_positions *tpos, const struct sockaddr *client)
+{
+	// no autohostlists in server mode
+	if (!params.server && ctrack && ctrack->dp && ctrack->hostname && ctrack->hostname_ah_check &&
+		!ctrack->failure_detect_finalized && ctrack->dp->hostlist_auto_udp_out)
+	{
+		if (!tpos) tpos = &ctrack->pos;
+		//printf("UDP_POS %u %u\n",tpos->client.pcounter, tpos->server.pcounter);
+		if (tpos->server.pcounter > ctrack->dp->hostlist_auto_udp_in)
+			// success
+			ctrack->failure_detect_finalized = true;
+		else if (tpos->client.pcounter >= ctrack->dp->hostlist_auto_udp_out)
+		{
+			// failure
+			char client_ip_port[48];
+			ctrack->failure_detect_finalized = true;
+			fill_client_ip_port(client, client_ip_port, sizeof(client_ip_port));
+			HOSTLIST_DEBUGLOG_APPEND("%s : profile %u (%s) : client %s : proto %s : udp_in %u<=%u udp_out %u>=%u",
+				ctrack->hostname, ctrack->dp->n, PROFILE_NAME(ctrack->dp), client_ip_port, l7proto_str(ctrack->l7proto),
+				tpos->server.pcounter, ctrack->dp->hostlist_auto_udp_in,
+				tpos->client.pcounter, ctrack->dp->hostlist_auto_udp_out);
+			auto_hostlist_failed(ctrack->dp, ctrack->hostname, ctrack->hostname_is_ip, client_ip_port, ctrack->l7proto);
+		}
+	}
+}
 
 static bool send_delayed(t_ctrack *ctrack)
 {
@@ -1101,10 +1128,7 @@ static uint8_t dpi_desync_tcp_packet_play(
 			if (rseq)
 			{
 				char client_ip_port[48];
-				if (*params.hostlist_auto_debuglog)
-					ntop46_port((struct sockaddr*)&dst, client_ip_port, sizeof(client_ip_port));
-				else
-					*client_ip_port = 0;
+				fill_client_ip_port((struct sockaddr*)&dst, client_ip_port, sizeof(client_ip_port));
 				if (seq_within(ctrack->pos.server.seq_last, ctrack->pos.server.seq0 + 1, ctrack->pos.server.seq0 + dp->hostlist_auto_incoming_maxseq))
 				{
 					bool bFail = false;
@@ -1776,20 +1800,14 @@ static uint8_t dpi_desync_udp_packet_play(
 				else
 				{
 					if (ctrack_replay)
-					{
 						ctrack_replay->hostname_ah_check = dp->hostlist_auto && !bCheckExcluded;
-						if (ctrack_replay->hostname_ah_check)
-						{
-							// first request is not retrans
-							if (!bDiscoveredHostname && !reasm_offset)
-								process_retrans_fail(ctrack_replay, IPPROTO_UDP, (struct sockaddr*)&src);
-						}
-					}
 				}
 			}
-
 		}
-	}
+
+		process_udp_fail(ctrack_replay, tpos, (struct sockaddr*)&src);
+	} // len_payload
+
 	if (bCheckDone && !bCheckResult)
 	{
 		DLOG("not applying tampering because of negative hostlist check\n");

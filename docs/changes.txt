@@ -89,3 +89,4 @@ v0.7
 * nfqws2: autohostlist: trigger http redirect failure if payload is http_req without connection proto check
 * nfqws2: push desync.track.pos.dt as float with nsec accuracy
 * zapret-auto: override host autostate key in automate_host_record
+* nfqws2: rewrite udp autohostlist failure detector logic

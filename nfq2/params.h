@@ -32,6 +32,8 @@
 #define	HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT	3
 #define HOSTLIST_AUTO_RETRANS_MAXSEQ		65536
 #define HOSTLIST_AUTO_INCOMING_MAXSEQ		4096
+#define HOSTLIST_AUTO_UDP_OUT			4
+#define HOSTLIST_AUTO_UDP_IN			1
 
 #define IPCACHE_LIFETIME		7200
 
@@ -80,6 +82,7 @@ struct desync_profile
 	// pointer to autohostlist. NULL if no autohostlist for the profile.
 	struct hostlist_file *hostlist_auto;
 	int hostlist_auto_fail_threshold, hostlist_auto_fail_time, hostlist_auto_retrans_threshold;
+	int hostlist_auto_udp_in, hostlist_auto_udp_out;
 	uint32_t hostlist_auto_retrans_maxseq, hostlist_auto_incoming_maxseq;
 
 	hostfail_pool *hostlist_auto_fail_counters;

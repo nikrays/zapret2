@@ -1436,6 +1436,8 @@ static void exithelp(void)
 		" --hostlist-auto-retrans-threshold=<int>\t\t; how many request retransmissions cause attempt to fail (default : %d)\n"
 		" --hostlist-auto-retrans-maxseq=<int>\t\t\t; count retransmissions only within this relative sequence (default : %u)\n"
 		" --hostlist-auto-incoming-maxseq=<int>\t\t\t; treat tcp connection as successful if incoming relative sequence exceedes this threshold (default : %u)\n"
+		" --hostlist-auto-udp-out=<int>\t\t\t\t; udp failure condition : sent at least `udp_out` packets (default : %u)\n"
+		" --hostlist-auto-udp-in=<int>\t\t\t\t; udp failure condition : received not more than `udp_in` packets (default : %u)\n"
 		" --hostlist-auto-debug=<logfile>\t\t\t; debug auto hostlist positives (global parameter)\n"
 		"\nLUA PACKET PASS MODE:\n"
 		" --payload=type[,type]\t\t\t\t\t; set payload types following LUA functions should process : %s\n"
@@ -1453,6 +1455,7 @@ static void exithelp(void)
 		HOSTLIST_AUTO_FAIL_THRESHOLD_DEFAULT, HOSTLIST_AUTO_FAIL_TIME_DEFAULT,
 		HOSTLIST_AUTO_RETRANS_THRESHOLD_DEFAULT,
 		HOSTLIST_AUTO_RETRANS_MAXSEQ, HOSTLIST_AUTO_INCOMING_MAXSEQ,
+		HOSTLIST_AUTO_UDP_OUT, HOSTLIST_AUTO_UDP_IN,
 		all_payloads
 	);
 	exit(1);
@@ -1551,6 +1554,8 @@ enum opt_indices {
 	IDX_HOSTLIST_AUTO_RETRANS_THRESHOLD,
 	IDX_HOSTLIST_AUTO_RETRANS_MAXSEQ,
 	IDX_HOSTLIST_AUTO_INCOMING_MAXSEQ,
+	IDX_HOSTLIST_AUTO_UDP_IN,
+	IDX_HOSTLIST_AUTO_UDP_OUT,
 	IDX_HOSTLIST_AUTO_DEBUG,
 	IDX_NEW,
 	IDX_SKIP,
@@ -1637,6 +1642,8 @@ static const struct option long_options[] = {
 	[IDX_HOSTLIST_AUTO_RETRANS_THRESHOLD] = {"hostlist-auto-retrans-threshold", required_argument, 0, 0},
 	[IDX_HOSTLIST_AUTO_RETRANS_MAXSEQ] = {"hostlist-auto-retrans-maxseq", required_argument, 0, 0},
 	[IDX_HOSTLIST_AUTO_INCOMING_MAXSEQ] = {"hostlist-auto-incoming-maxseq", required_argument, 0, 0},
+	[IDX_HOSTLIST_AUTO_UDP_IN] = {"hostlist-auto-udp-in", required_argument, 0, 0},
+	[IDX_HOSTLIST_AUTO_UDP_OUT] = {"hostlist-auto-udp-out", required_argument, 0, 0},
 	[IDX_HOSTLIST_AUTO_DEBUG] = {"hostlist-auto-debug", required_argument, 0, 0},
 	[IDX_NEW] = {"new", no_argument, 0, 0},
 	[IDX_SKIP] = {"skip", no_argument, 0, 0},
@@ -2090,6 +2097,12 @@ int main(int argc, char **argv)
 			break;
 		case IDX_HOSTLIST_AUTO_INCOMING_MAXSEQ:
 			dp->hostlist_auto_incoming_maxseq = (uint32_t)atoi(optarg);
+			break;
+		case IDX_HOSTLIST_AUTO_UDP_OUT:
+			dp->hostlist_auto_udp_out = atoi(optarg);
+			break;
+		case IDX_HOSTLIST_AUTO_UDP_IN:
+			dp->hostlist_auto_udp_in = atoi(optarg);
 			break;
 		case IDX_HOSTLIST_AUTO_DEBUG:
 		{
