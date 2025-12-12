@@ -112,7 +112,7 @@ int DLOG_FILENAME_VA(const char *filename, const char *format, va_list args)
 
 typedef void (*f_log_function)(int priority, const char *line);
 
-static char log_buf[1024];
+static char log_buf[4096];
 static size_t log_buf_sz=0;
 static void syslog_log_function(int priority, const char *line)
 {
@@ -158,11 +158,18 @@ static void android_log_function(int priority, const char *line)
 #endif
 static void log_buffered(f_log_function log_function, int syslog_priority, const char *format, va_list args)
 {
-	if (vsnprintf(log_buf+log_buf_sz,sizeof(log_buf)-log_buf_sz,format,args)>0)
+	if (vsnprintf(log_buf+log_buf_sz,sizeof(log_buf)-log_buf_sz-1,format,args)>0)
 	{
 		log_buf_sz=strlen(log_buf);
 		// log when buffer is full or buffer ends with \n
-		if (log_buf_sz>=(sizeof(log_buf)-1) || (log_buf_sz && log_buf[log_buf_sz-1]=='\n'))
+		if (log_buf_sz==(sizeof(log_buf)-2))
+		{
+			log_buf[log_buf_sz++] = '\n';
+			log_buf[log_buf_sz] = 0;
+			log_function(syslog_priority,log_buf);
+			log_buf_sz = 0;
+		}
+		else if (log_buf_sz && log_buf[log_buf_sz-1]=='\n')
 		{
 			log_function(syslog_priority,log_buf);
 			log_buf_sz = 0;

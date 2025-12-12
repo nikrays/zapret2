@@ -95,3 +95,4 @@ v0.7.1
 
 * init.d: fix non-working incoming redirect
 * nfqws2: cancel reasm if server window size is smaller than expected reasm size
+* nfqws2: add EOL at the end of truncated buffered DLOG line if it's too large. increase log line buffer
