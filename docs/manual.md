@@ -1199,7 +1199,7 @@ ipv6 extension headers и tcp options представляются в форме
 | lua_in_cutoff | bool | отсечение LUA от входящего направления | только для чтения |
 | lua_out_cutoff | bool | отсечение LUA от исходящего направления | только для чтения |
 | t_start | number | unix time первого пакета потока | включает дробную часть с высокой точностью |
-| pos | table | счетчики по различным направлениям | содержит таблиц client, server, direct, reverse |
+| pos | table | счетчики по различным направлениям | содержит таблицы client, server, direct, reverse |
 
 Таблица track.pos содержит подтаблицы с набором счетчиков по двум направлениям - client и server.
 client означает пакеты от клиента, server - пакеты от сервера.
