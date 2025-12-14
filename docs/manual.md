@@ -1181,6 +1181,8 @@ ipv6 extension headers и tcp options представляются в форме
 | th_x2 | зарезервированное поле. используется для расширенных tcp flags |
 | th_off | размер tcp хедера в блоках по 4 байта |
 | th_flags | tcp флаги : TH_FIN,TH_SYN,TH_RST,TH_PUSH,TH_ACK,TH_FIN,TH_URG,THE_ECE,TH_CWR |
+| th_seq | sequence number |
+| th_acl | acknowledgement number |
 | th_win | размер tcp окна |
 | th_sum | чексумма tcp |
 | th_urp | urgent pointer |
