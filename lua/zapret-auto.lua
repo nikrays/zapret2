@@ -88,6 +88,18 @@ function is_dpi_redirect(hostname, location)
 	return false
 end
 
+function standard_detector_defaults(arg)
+	return {
+		inseq = tonumber(arg.inseq) or 4096,
+		retrans = tonumber(arg.retrans) or 3,
+		maxseq = tonumber(arg.maxseq) or 32768,
+		udp_in = tonumber(arg.udp_in) or 1,
+		udp_out = tonumber(arg.udp_out) or 4,
+		no_http_redirect = arg.no_http_redirect,
+		no_rst = arg.no_rst
+	}
+end
+
 -- standard failure detector
 -- works with tcp and udp
 -- detected failures:
@@ -99,37 +111,33 @@ end
 -- arg: retrans=N - tcp: retrans count threshold. default is 3
 -- arg: inseq=<rseq> - tcp: maximum relative sequence number to treat incoming RST as DPI reset. default is 4K
 -- arg: no_http_redirect - tcp: disable http_reply dpi redirect trigger
+-- arg: no_rst - tcp: disable incoming RST trigger
 -- arg: udp_out - udp: >= outgoing udp packets. default is 4
 -- arg: udp_in - udp: with <= incoming udp packets. default is 1
 function standard_failure_detector(desync, crec)
-	local inseq = tonumber(desync.arg.inseq) or 4096
-	local retrans = tonumber(desync.arg.retrans) or 3
-	local maxseq = tonumber(desync.arg.maxseq) or 32768
-	local udp_in = tonumber(desync.arg.udp_in) or 1
-	local udp_out = tonumber(desync.arg.udp_out) or 4
-
+	local arg = standard_detector_defaults(desync.arg)
 	local trigger = false
 	if desync.dis.tcp then
 		local seq = pos_get(desync,'s')
 		if desync.outgoing then
-			if #desync.dis.payload>0 and retrans and maxseq>0 and seq<=maxseq and (crec.retrans or 0)<retrans then
+			if #desync.dis.payload>0 and arg.retrans and arg.maxseq>0 and seq<=arg.maxseq and (crec.retrans or 0)<arg.retrans then
 				if is_retransmission(desync) then
 					crec.retrans = crec.retrans and (crec.retrans+1) or 1
-					DLOG("standard_failure_detector: retransmission "..crec.retrans.."/"..retrans)
-					trigger = crec.retrans>=retrans
+					DLOG("standard_failure_detector: retransmission "..crec.retrans.."/"..arg.retrans)
+					trigger = crec.retrans>=arg.retrans
 				end
 			end
 		else
-			if inseq>0 and bitand(desync.dis.tcp.th_flags, TH_RST)~=0 then
-				trigger = seq<=inseq
+			if not arg.no_rst and arg.inseq>0 and bitand(desync.dis.tcp.th_flags, TH_RST)~=0 and seq>=1 then
+				trigger = seq<=arg.inseq
 				if b_debug then
 					if trigger then
-						DLOG("standard_failure_detector: incoming RST s"..seq.." in range s"..inseq)
+						DLOG("standard_failure_detector: incoming RST s"..seq.." in range s"..arg.inseq)
 					else
-						DLOG("standard_failure_detector: not counting incoming RST s"..seq.." beyond s"..inseq)
+						DLOG("standard_failure_detector: not counting incoming RST s"..seq.." beyond s"..arg.inseq)
 					end
 				end
-			elseif not desync.arg.no_http_redirect and desync.l7payload=="http_reply" and desync.track.hostname then
+			elseif not arg.no_http_redirect and desync.l7payload=="http_reply" and desync.track.hostname then
 				local hdis = http_dissect_reply(desync.dis.payload)
 				if hdis and (hdis.code==302 or hdis.code==307) and hdis.headers.location and hdis.headers.location then
 					trigger = is_dpi_redirect(desync.track.hostname, hdis.headers.location.value)
@@ -145,13 +153,13 @@ function standard_failure_detector(desync, crec)
 		end
 	elseif desync.dis.udp then
 		if desync.outgoing then
-			if udp_out>0 then
+			if arg.udp_out>0 then
 				local pos_out = pos_get(desync,'n',false)
 				local pos_in = pos_get(desync,'n',true)
-				trigger = pos_out>=udp_out and pos_in<=udp_in
+				trigger = pos_out>=arg.udp_out and pos_in<=arg.udp_in
 				if trigger then
 					if b_debug then
-						DLOG("standard_failure_detector: udp_out "..pos_out..">="..udp_out.." udp_in "..pos_in.."<="..udp_in)
+						DLOG("standard_failure_detector: arg.udp_out "..pos_out..">="..arg.udp_out.." arg.udp_in "..pos_in.."<="..arg.udp_in)
 					end
 				end
 			end
@@ -171,30 +179,26 @@ end
 -- arg: udp_out - udp : must be nil or >0 to test udp_in
 -- arg: udp_in - udp: if number if incoming packets > udp_in it means success
 function standard_success_detector(desync, crec)
-	local inseq = tonumber(desync.arg.inseq) or 4096
-	local maxseq = tonumber(desync.arg.maxseq) or 32768
-	local udp_in = tonumber(desync.arg.udp_in) or 1
-	local udp_out = tonumber(desync.arg.udp_out) or 4
-
+	local arg = standard_detector_defaults(desync.arg)
 	if desync.dis.tcp then
 		local seq = pos_get(desync,'s')
 		if desync.outgoing then
-			if maxseq>0 and seq>maxseq then
-				DLOG("standard_success_detector: outgoing s"..seq.." is beyond s"..maxseq..". treating connection as successful")
+			if arg.maxseq>0 and seq>arg.maxseq then
+				DLOG("standard_success_detector: outgoing s"..seq.." is beyond s"..arg.maxseq..". treating connection as successful")
 				return true
 			end
 		else
-			if inseq>0 and seq>inseq then
-				DLOG("standard_success_detector: incoming s"..seq.." is beyond s"..inseq..". treating connection as successful")
+			if arg.inseq>0 and seq>arg.inseq then
+				DLOG("standard_success_detector: incoming s"..seq.." is beyond s"..arg.inseq..". treating connection as successful")
 				return true
 			end
 		end
 	elseif desync.dis.udp then
 		if not desync.outgoing then
 			local pos = pos_get(desync,'n')
-			if udp_out>0 and pos>udp_in then
+			if arg.udp_out>0 and pos>arg.udp_in then
 				if b_debug then
-					DLOG("standard_success_detector: udp_in "..pos..">"..udp_in)
+					DLOG("standard_success_detector: arg.udp_in "..pos..">"..arg.udp_in)
 				end
 				return true
 			end
