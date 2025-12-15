@@ -1286,6 +1286,7 @@ void lua_pushf_ctrack_pos(const t_ctrack *ctrack, const t_ctrack_position *pos)
 		lua_pushf_lint("seq0", pos->seq0);
 		lua_pushf_lint("seq", pos->seq_last);
 		lua_pushf_lint("rseq", pos->seq_last - pos->seq0);
+		lua_pushf_bool("rseq_over_2G", pos->rseq_over_2G);
 		lua_pushf_int("pos", pos->pos - pos->seq0);
 		lua_pushf_int("uppos", pos->uppos - pos->seq0);
 		lua_pushf_int("uppos_prev", pos->uppos_prev - pos->seq0);
@@ -1293,7 +1294,6 @@ void lua_pushf_ctrack_pos(const t_ctrack *ctrack, const t_ctrack_position *pos)
 		lua_pushf_int("winsize_calc", pos->winsize_calc);
 		lua_pushf_int("scale", pos->scale);
 		lua_pushf_int("mss", pos->mss);
-		lua_pushf_bool("seq_over_2G", pos->seq_over_2G);
 		lua_rawset(params.L,-3);
 	}
 

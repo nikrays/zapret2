@@ -156,10 +156,10 @@ static void ConntrackApplyPos(const struct tcphdr *tcp, t_ctrack *t, bool bRever
 	if (mss && !direct->mss) direct->mss = mss;
 	if (scale != SCALE_NONE) direct->scale = scale;
 
-	if (!direct->seq_over_2G && ((direct->seq_last - direct->seq0) & 0x80000000))
-		direct->seq_over_2G = true;
-	if (!reverse->seq_over_2G && ((reverse->seq_last - reverse->seq0) & 0x80000000))
-		reverse->seq_over_2G = true;
+	if (!direct->rseq_over_2G && ((direct->seq_last - direct->seq0) & 0x80000000))
+		direct->rseq_over_2G = true;
+	if (!reverse->rseq_over_2G && ((reverse->seq_last - reverse->seq0) & 0x80000000))
+		reverse->rseq_over_2G = true;
 }
 
 // non-tcp packets are passed with tcphdr=NULL but len_payload filled

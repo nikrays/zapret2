@@ -507,7 +507,7 @@ static uint8_t ct_new_postnat_fix(const t_ctrack *ctrack, const struct dissect *
 
 static bool pos_overflow(const t_ctrack_position *pos, char mode)
 {
-	return (mode=='s' || mode=='p') && pos && pos->seq_over_2G;
+	return (mode=='s' || mode=='p') && pos && pos->rseq_over_2G;
 }
 static uint64_t pos_get(const t_ctrack_position *pos, char mode)
 {

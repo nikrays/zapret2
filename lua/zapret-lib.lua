@@ -238,7 +238,7 @@ end
 function pos_counter_overflow(desync, mode, reverse)
 	if not desync.track or not desync.track.tcp or (mode~='s' and mode~='p') then return false end
 	local track_pos = reverse and desync.track.pos.reverse or desync.track.pos.direct
-	return track_pos.tcp.seq_over_2G
+	return track_pos.tcp.rseq_over_2G
 end
 -- these functions duplicate range check logic from C code
 -- mode must be n,d,b,s,x,a

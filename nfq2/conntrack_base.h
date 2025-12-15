@@ -28,7 +28,7 @@ typedef struct
 	uint16_t mss;
 	uint32_t winsize_calc;	// calculated window size
 	uint8_t scale;		// last seen window scale factor. SCALE_NONE if none
-	bool seq_over_2G;
+	bool rseq_over_2G;
 } t_ctrack_position;
 
 typedef struct
