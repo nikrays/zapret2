@@ -107,6 +107,7 @@ v0.7.2
 * nfqws2: clean lua cutoff on profile change
 * zapret-auto: separate hostkey function
 
-v0.7.2
+v0.7.3
 
 * nfqws2, zapret-lib : check tcp sequence range overflow
+* zapret-lib : seq compare functions

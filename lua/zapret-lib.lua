@@ -303,8 +303,31 @@ end
 function pos_str(desync, pos)
 	return pos.mode..pos_get(desync, pos.mode)
 end
+
+-- sequence comparision functions. they work only within 2G interval
+-- seq1>=seq2
+function seq_ge(seq1, seq2)
+	return 0==bitand(u32add(seq1, -seq2), 0x80000000)
+end
+-- seq1>seq2
+function seq_gt(seq1, seq2)
+	return seq1~=seq2 and seq_ge(seq1, seq2)
+end
+-- seq1<seq2
+function seq_lt(seq1, seq2)
+	return 0~=bitand(u32add(seq1, -seq2), 0x80000000)
+end
+-- seq1<=seq2
+function seq_le(seq1, seq2)
+	return seq1==seq2 or 0~=bitand(u32add(seq1, -seq2), 0x80000000)
+end
+-- seq_low<=seq<=seq_hi
+function seq_within(seq, seq_low, seq_hi)
+	return seq_ge(seq, seq_low) and seq_le(seq, seq_hi)
+end
+
 function is_retransmission(desync)
-	return desync.track and desync.track.pos.direct.tcp and 0==bitand(u32add(desync.track.pos.direct.tcp.uppos_prev, -desync.track.pos.direct.tcp.pos), 0x80000000)
+	return desync.track and desync.track.pos.direct.tcp and seq_ge(desync.track.pos.direct.tcp.uppos_prev, desync.track.pos.direct.tcp.pos)
 end
 
 -- prepare standard rawsend options from desync
