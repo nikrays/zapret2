@@ -1742,12 +1742,15 @@ function instance_cutoff(ctx, outgoing)
 * outgoing = nil - оба направления
 
 ```
-function instance_cutoff(ctx, outgoing)
+function lua_cutoff(ctx, outgoing)
 ```
 
 Аналогично `instance_cutoff`, но от потока отсекается весь профиль.
 При смене профиля после получения hostname или обнаружения протокола потока lua cutoff сбрасывается,
 поскольку в новом профиле совершенно другой набор инстансов, которые не просили их отсекать.
+
+Состояние lua cutoff может случиться и естественным образом, если все инстансы превысили верхнюю границу
+range или самоотсекли себя от нправления.
 
 ```
 function execution_plan(ctx)
