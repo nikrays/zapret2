@@ -101,7 +101,9 @@ bool lua_reconstruct_tcphdr(int idx, struct tcphdr *tcp, size_t *len);
 bool lua_reconstruct_udphdr(int idx, struct udphdr *udp);
 bool lua_reconstruct_dissect(int idx, uint8_t *buf, size_t *len, bool badsum, bool ip6_preserve_next);
 
+#define MAGIC_CTX	0xE73DC935
 typedef struct {
+	uint32_t magic;
 	unsigned int func_n;
 	const char *func, *instance;
 	const struct desync_profile *dp;

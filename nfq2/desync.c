@@ -710,7 +710,7 @@ static uint8_t desync(
 	struct func_list *func;
 	int ref_arg = LUA_NOREF, status;
 	bool b, b_cutoff_all, b_unwanted_payload;
-	t_lua_desync_context ctx = { .dp = dp, .ctrack = ctrack, .dis = dis, .cancel = false, .incoming = bIncoming };
+	t_lua_desync_context ctx = { .magic = MAGIC_CTX, .dp = dp, .ctrack = ctrack, .dis = dis, .cancel = false, .incoming = bIncoming };
 	const char *sDirection = bIncoming ? "in" : "out";
 	struct packet_range *range;
 	size_t l;

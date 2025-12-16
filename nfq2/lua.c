@@ -690,6 +690,22 @@ static int luacall_clock_gettime(lua_State *L)
 	}
 	LUA_STACK_GUARD_RETURN(L,2)
 }
+
+static t_lua_desync_context *lua_desync_ctx()
+{
+	if (lua_isnil(params.L,1))
+		luaL_error(params.L, "missing ctx");
+	if (!lua_islightuserdata(params.L,1))
+		luaL_error(params.L, "bad ctx - invalid data type");
+
+	t_lua_desync_context *ctx = lua_touserdata(params.L,1);
+	// ensure it's really ctx. LUA could pass us any lightuserdata pointer
+	if (ctx->magic!=MAGIC_CTX)
+		luaL_error(params.L, "bad ctx - magic bytes invalid");
+
+	return ctx;
+}
+
 static int luacall_instance_cutoff(lua_State *L)
 {
 	// out : instance_name.profile_number[0]
@@ -699,53 +715,42 @@ static int luacall_instance_cutoff(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 
-	const t_lua_desync_context *ctx;
+	const t_lua_desync_context *ctx = lua_desync_ctx();
 
-	if (lua_isnil(L,1))
-		// this can happen in orchestrated function. they do not have their own ctx and they cant cutoff
-		DLOG("instance cutoff not possible because missing ctx\n");
-	else
+	int argc=lua_gettop(L);
+	bool bIn,bOut;
+	if (argc>=2 && lua_type(L,2)!=LUA_TNIL)
 	{
-		if (!lua_islightuserdata(L,1))
-			luaL_error(L, "instance_cutoff expect desync context in the first argument");
-		ctx = lua_touserdata(L,1);
-
-		int argc=lua_gettop(L);
-		bool bIn,bOut;
-		if (argc>=2 && lua_type(L,2)!=LUA_TNIL)
-		{
-			luaL_checktype(L,2,LUA_TBOOLEAN);
-			bOut = lua_toboolean(L,2);
-			bIn = !bOut;
-		}
-		else
-			bIn = bOut = true;
-
-		if (ctx->ctrack)
-		{
-			DLOG("instance cutoff for '%s' in=%u out=%u\n",ctx->instance,bIn,bOut);
-			lua_rawgeti(L,LUA_REGISTRYINDEX,ctx->ctrack->lua_instance_cutoff);
-			lua_getfield(L,-1,ctx->instance);
-			if (!lua_istable(L,-1))
-			{
-				lua_pop(L,1);
-				lua_pushf_table(ctx->instance);
-				lua_getfield(L,-1,ctx->instance);
-			}
-			lua_rawgeti(L,-1,ctx->dp->n);
-			if (!lua_istable(L,-1))
-			{
-				lua_pop(L,1);
-				lua_pushi_table(ctx->dp->n);
-				lua_rawgeti(L,-1,ctx->dp->n);
-			}
-			if (bOut) lua_pushi_bool(0,true);
-			if (bIn) lua_pushi_bool(1,true);
-			lua_pop(L,3);
-		}
-		else
-			DLOG("instance cutoff requested for '%s' in=%u out=%u but not possible without conntrack\n",ctx->instance,bIn,bOut);
+		luaL_checktype(L,2,LUA_TBOOLEAN);
+		bOut = lua_toboolean(L,2);
+		bIn = !bOut;
 	}
+	else
+		bIn = bOut = true;
+	if (ctx->ctrack)
+	{
+		DLOG("instance cutoff for '%s' in=%u out=%u\n",ctx->instance,bIn,bOut);
+		lua_rawgeti(L,LUA_REGISTRYINDEX,ctx->ctrack->lua_instance_cutoff);
+		lua_getfield(L,-1,ctx->instance);
+		if (!lua_istable(L,-1))
+		{
+			lua_pop(L,1);
+			lua_pushf_table(ctx->instance);
+			lua_getfield(L,-1,ctx->instance);
+		}
+		lua_rawgeti(L,-1,ctx->dp->n);
+		if (!lua_istable(L,-1))
+		{
+			lua_pop(L,1);
+			lua_pushi_table(ctx->dp->n);
+			lua_rawgeti(L,-1,ctx->dp->n);
+		}
+		if (bOut) lua_pushi_bool(0,true);
+		if (bIn) lua_pushi_bool(1,true);
+		lua_pop(L,3);
+	}
+	else
+		DLOG("instance cutoff requested for '%s' in=%u out=%u but not possible without conntrack\n",ctx->instance,bIn,bOut);
 
 	LUA_STACK_GUARD_RETURN(L,0)
 }
@@ -785,11 +790,7 @@ static int luacall_lua_cutoff(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 
-	t_lua_desync_context *ctx;
-
-	if (!lua_islightuserdata(L,1))
-		luaL_error(L, "lua_cutoff expect desync context in the first argument");
-	ctx = lua_touserdata(L,1);
+	t_lua_desync_context *ctx = lua_desync_ctx();
 
 	int argc=lua_gettop(L);
 	bool bIn,bOut;
@@ -821,11 +822,7 @@ static int luacall_execution_plan(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 
-	const t_lua_desync_context *ctx;
-
-	if (!lua_islightuserdata(L,1))
-		luaL_error(L, "execution_plan expect desync context in the first argument");
-	ctx = lua_touserdata(L,1);
+	t_lua_desync_context *ctx = lua_desync_ctx();
 
 	lua_newtable(L);
 
@@ -862,11 +859,7 @@ static int luacall_execution_plan_cancel(lua_State *L)
 {
 	lua_check_argc(L,"execution_plan_cancel",1);
 
-	t_lua_desync_context *ctx;
-
-	if (!lua_islightuserdata(L,1))
-		luaL_error(L, "execution_plan_cancel expect desync context in the first argument");
-	ctx = lua_touserdata(L,1);
+	t_lua_desync_context *ctx = lua_desync_ctx();
 
 	DLOG("execution plan cancel from '%s'\n",ctx->instance);
 
@@ -881,11 +874,7 @@ static int luacall_raw_packet(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 
-	const t_lua_desync_context *ctx;
-
-	if (!lua_islightuserdata(L,1))
-		luaL_error(L, "raw_packet expect desync context in the first argument");
-	ctx = lua_touserdata(L,1);
+	const t_lua_desync_context *ctx = lua_desync_ctx();
 
 	lua_pushlstring(L, (const char*)ctx->dis->data_pkt, ctx->dis->len_pkt);
 
