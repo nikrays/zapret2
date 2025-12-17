@@ -1812,6 +1812,7 @@ int main(int argc, char **argv)
 						fprintf(stderr, "cannot create %s\n", params.debug_logfile);
 						exit_clean(1);
 					}
+					fclose(F);
 					params.debug = true;
 					params.debug_target = LOG_TARGET_FILE;
 				}
