@@ -2604,6 +2604,7 @@ function fake(ctx, desync)
 ```
 
 * arg: [standard direction](#стандартные-наборы-параметров)
+* arg: [standard payload](#стандартные-наборы-параметров)
 * arg: [standard fooling](#операции-с-диссектами)
 * arg: [standard ipid](#операции-с-диссектами)
 * arg: [standard ipfrag](#операции-с-диссектами)
