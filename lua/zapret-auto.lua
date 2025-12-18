@@ -442,17 +442,25 @@ function repeater(ctx, desync)
 	local stop = desync.arg.stop
 	local verdict = VERDICT_PASS
 	local instances = tonumber(desync.arg.instances) or 1
-	local pop = {}
-	for i=1,instances do
-		pop[i] = plan_instance_pop(desync)
+	local repinst = desync.func_instance
+	if instances>#desync.plan then
+		instances = #desync.plan
 	end
+	-- save plan copy
+	local plancopy = deepcopy(desync.plan)
 	for r=1,repeats do
-		DLOG("repeater: "..r.."/"..repeats)
-		for i=1,#pop do
-			verdict = plan_instance_execute(desync, verdict, pop[i])
+		DLOG("repeater: "..repinst.." "..r.."/"..repeats)
+		for i=1,instances do
+			local instance = plan_instance_pop(desync)
+			verdict = plan_instance_execute(desync, verdict, instance)
 		end
+		-- rollback desync plan
+		desync.plan = deepcopy(plancopy)
 	end
-
+	-- remove repeated instances desync plan
+	for i=1,instances do
+		table.remove(desync.plan,1)
+	end
 	if stop then
 		plan_clear(desync)
 		return verdict
