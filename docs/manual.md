@@ -3233,7 +3233,7 @@ function standard_failure_detector(desync, crec)
 * arg: inseq - считать неудачей RST и http redirect в пределах входящих relative sequence от 1 до inseq. По умолчанию - 4096.
 * arg: no_rst - не определять RST как неудачу
 * arg: no_http_redirect - не определять http redirect как неудачу
-* arg: udp_out, udp_in - считать неудачей ситуацию, когда по потоку отослано >=udp_out пакетов, а принято <=udp_in пакетов
+* arg: udp_out, udp_in - считать неудачей ситуацию, когда по потоку отослано >=udp_out пакетов, а принято <=udp_in пакетов. Смысл : мы много шлем, а нам не отвечают или отвечают мало.
 
 Стандартный детектор неудач.
 
