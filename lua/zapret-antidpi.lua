@@ -529,7 +529,7 @@ function multidisorder_legacy(ctx, desync)
 		if b_debug then DLOG("multidisorder_legacy: split pos: "..spos) end
 		local pos = resolve_multi_pos(fulldata, desync.l7payload, spos)
 		if b_debug then DLOG("multidisorder_legacy: resolved split pos: "..table.concat(zero_based_pos(pos)," ")) end
-		DLOG("multidisorder_legacy: reasm piece range "..(range_low-1).."-"..(range_hi-2))
+		DLOG("multidisorder_legacy: reasm piece range: "..(range_low-1).."-"..(range_hi-2))
 		pos_array_normalize(pos, range_low, range_hi)
 		delete_pos_1(pos) -- cannot split at the first byte
 		if #pos>0 then
@@ -538,10 +538,10 @@ function multidisorder_legacy(ctx, desync)
 			if desync.arg.seqovl then
 				seqovl = resolve_pos(fulldata, desync.l7payload, desync.arg.seqovl)
 				if seqovl then
-					DLOG("multidisorder_legacy: resolved seqovl pos to "..(seqovl-1))
+					DLOG("multidisorder_legacy: resolved seqovl pos: "..(seqovl-1))
 					seqovl = pos_normalize(seqovl, range_low, range_hi)
 					if seqovl then
-						DLOG("multidisorder_legacy: normalized seqovl pos to "..(seqovl-1))
+						DLOG("multidisorder_legacy: normalized seqovl pos: "..(seqovl-1))
 					else
 						DLOG("multidisorder_legacy: normalized seqovl pos is outside of the reasm piece range")
 					end
