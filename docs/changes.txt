@@ -122,3 +122,4 @@ v0.7.5
 * github actions: separate target arm-old with LUA classic, not JIT
 * zapret-auto: iff/neg in repeater
 * zapret-antidpi: multidisorder_legacy
+* ipset: remove *reestr* because source does not and will probably not ever update
