@@ -3675,6 +3675,8 @@ FAKE_QUIC - путь к файлу с фейком для quic
 SEQOVL_PATTERN_HTTP - путь к файлу с seqovl pattern для http
 SEQOVL_PATTERN_HTTPS - путь к файлу с seqovl pattern для https
 
+MULTIDISORDER=multidisorder_legacy - заменить multidisorder на вариант из nfqws1
+
 NOTEST_BASIC_HTTP=1 - отмена тестов 10-http-basic.sh
 NOTEST_MULTI_HTTP=1 - отмена тестов http 20-multi.sh
 NOTEST_MULTI_HTTPS=1 - отмена тестов https 20-multi.sh
