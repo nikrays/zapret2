@@ -415,7 +415,8 @@ static bool reasm_start(t_ctrack *ctrack, t_reassemble *reasm, uint8_t proto, ui
 static bool reasm_client_start(t_ctrack *ctrack, uint8_t proto, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
 {
 	if (!ctrack) return false;
-	if (proto==IPPROTO_TCP && ctrack->pos.server.winsize_calc < sz)
+	// if winsize_calc==0 it means we dont know server window size - no incoming packets redirected ?
+	if (proto==IPPROTO_TCP && ctrack->pos.server.winsize_calc && (ctrack->pos.server.winsize_calc < sz))
 	{
 		// this is rare but possible situation
 		// server gave us too small tcp window
