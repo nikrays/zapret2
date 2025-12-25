@@ -1408,7 +1408,11 @@ bool IsWireguardKeepalive(const uint8_t *data, size_t len)
 }
 bool IsDht(const uint8_t *data, size_t len)
 {
-	return len>=7 && data[0]=='d' && (data[1]=='1' || data[1]=='2') && data[2]==':' && data[len-1]=='e';
+	return len>=5 && data[0]=='d' && data[2]==':' && data[len-1]=='e' &&
+		(data[1]=='1' && data[3]=='a' && data[4]=='d' ||
+		data[1]=='1' && data[3]=='r' && data[4]=='d' ||
+		data[1]=='2' && data[3]=='i' && data[4]=='p' ||
+		data[1]=='1' && data[3]=='e' && data[4]=='l');
 }
 bool IsDiscordIpDiscoveryRequest(const uint8_t *data, size_t len)
 {

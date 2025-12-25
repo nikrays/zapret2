@@ -21,9 +21,9 @@ zapret_custom_firewall()
 	local f uf4 uf6
 	local first_packet_only="$ipt_connbytes 1:1"
 
-	f='-p udp -m length --length 109:407 -m u32 --u32'
-	uf4='0>>22&0x3C@8>>16=0x6431'
-	uf6='48>>16=0x6431'
+	f='-p udp -m u32 --u32'
+	uf4='0>>22&0x3C@4>>16=13:0xFFFF && 0>>22&0x3C@8>>16=0x6431:0x6432'
+	uf6='44>>16=13:0xFFFF && 48>>16=0x6431:0x6432'
 	fw_nfqws_post $1 "$f $uf4 $first_packet_only"  "$f $uf6 $first_packet_only" $QNUM_DHT4ALL
 }
 zapret_custom_firewall_nft()
@@ -33,6 +33,6 @@ zapret_custom_firewall_nft()
         local f
         local first_packet_only="$nft_connbytes 1"
 
-        f="meta length 109-407 meta l4proto udp @ih,0,16 0x6431"
+        f="udp length ge 13 meta l4proto udp @ih,0,16 0x6431-0x6432"
         nft_fw_nfqws_post "$f $first_packet_only" "$f $first_packet_only" $QNUM_DHT4ALL
 }
