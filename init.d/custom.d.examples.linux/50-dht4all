@@ -1,4 +1,4 @@
-# this custom script runs desync to DHT packets with udp payload length 101..399 , without ipset/hostlist filtering
+# this custom script runs desync to DHT packets with udp payload length >=5 , without ipset/hostlist filtering
 # NOTE: @ih requires nft 1.0.1+ and updated kernel version. it's confirmed to work on 5.15 (openwrt 23) and not work on 5.10 (openwrt 22)
 
 # can override in config :
