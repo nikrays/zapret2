@@ -4245,6 +4245,7 @@ zapret сам с ними ничего не делает. Они нужны, ч�
 ```
 #!/bin/sh
 . /opt/zapret2/init.d/openwrt/functions
+#. /opt/zapret2/init.d/sysv/functions
 
 create_ipset no-update
 ```
