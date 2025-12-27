@@ -9,6 +9,7 @@
 #elif defined(__CYGWIN__)
 #include <processthreadsapi.h>
 #endif
+#include <errno.h>
 
 #include "lua.h"
 #include "params.h"
@@ -2829,7 +2830,10 @@ bool lua_test_init_script_files(void)
 	{
 		if (str->str[0]=='@' && !file_open_test(str->str+1, O_RDONLY))
 		{
-			DLOG_ERR("LUA file '%s' not accessible\n",str->str+1);
+			int e = errno;
+			DLOG_ERR("LUA file '%s' not accessible\n", str->str+1);
+			if (e==EACCES)
+				DLOG_ERR("I drop my privileges and do not run Lua as root\ncheck file permissions and +x rights on all directories in the path\n", str->str+1);
 			return false;
 		}
 	}
