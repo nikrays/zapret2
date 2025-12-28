@@ -71,7 +71,7 @@ pktws_fake_https_vary_()
 	shift; shift; shift
 	pktws_curl_test_update $testf $domain ${FAKE_HTTPS:+--blob=$fake:@"$FAKE_HTTPS" }$pre $PAYLOAD --lua-desync=fake:blob=$fake:$fooling:repeats=$FAKE_REPEATS --lua-desync=$splitf:pos=$split $post && ok_any=1
 	pktws_curl_test_update $testf $domain $pre $PAYLOAD --lua-desync=fake:blob=0x00000000:$fooling:repeats=$FAKE_REPEATS --lua-desync=$splitf:pos=$split $post && ok_any=1
-	pktws_curl_test_update $testf $domain $pre $PAYLOAD --lua-desync=fake:blob=0x00000000:$fooling:repeats=$FAKE_REPEATS --lua-desync=fake:blob=$fake:$fooling:tls_mod=rnd,dupsid:repeats=$FAKE_REPEATS --lua-desync=$splitf:pos=$split $post && ok_any=1
+	pktws_curl_test_update $testf $domain ${FAKE_HTTPS:+--blob=$fake:@"$FAKE_HTTPS" }$pre $PAYLOAD --lua-desync=fake:blob=0x00000000:$fooling:repeats=$FAKE_REPEATS --lua-desync=fake:blob=$fake:$fooling:tls_mod=rnd,dupsid:repeats=$FAKE_REPEATS --lua-desync=$splitf:pos=$split $post && ok_any=1
 	pktws_curl_test_update $testf $domain ${FAKE_HTTPS:+--blob=$fake:@"$FAKE_HTTPS" }$pre $PAYLOAD --lua-desync=multisplit:blob=$fake:$fooling:pos=2:nodrop:repeats=$FAKE_REPEATS --lua-desync=$splitf:pos=$split $post && ok_any=1
 	pktws_curl_test_update $testf $domain ${FAKE_HTTPS:+--blob=$fake:@"$FAKE_HTTPS" }$pre $PAYLOAD --lua-desync=fake:blob=$fake:$fooling:tls_mod=rnd,dupsid,padencap:repeats=$FAKE_REPEATS --lua-desync=$splitf:pos=$split $post && ok_any=1
 	[ "$ok_any" = 1 ] && ok=1

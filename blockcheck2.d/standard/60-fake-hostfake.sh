@@ -29,7 +29,7 @@ pktws_check_hostfake()
 	# $2 - domain
 	# $3 - PRE args for nfqws2
 	local testf=$1 domain="$2" pre="$3"
-	local ok ttls attls f fake fooling
+	local ok ttls attls f fooling
 
 	[ "$need_hostfakesplit" = 0 ] && return 0
 
