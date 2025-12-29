@@ -142,3 +142,4 @@ v0.8.0
 * nfqws2: do not treat quic handshake messages as initials
 * zapret-lib: tls dissector/reconstructor
 * zapret-antidpi: tls_client_hello_clone
+* zapret-antidpi: "optional" arg to blob taking functions
