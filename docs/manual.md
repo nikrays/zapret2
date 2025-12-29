@@ -109,6 +109,7 @@
     - [dissect\_url](#dissect_url)
     - [dissect\_nld](#dissect_nld)
     - [dissect\_http](#dissect_http)
+    - [dissect\_tls](#dissect_tls)
   - [Работа с элементами L3 и L4 протоколов](#работа-с-элементами-l3-и-l4-протоколов)
     - [find\_tcp\_options](#find_tcp_options)
     - [ip6hdr](#ip6hdr)
@@ -2319,6 +2320,13 @@ function find_next_line(s, pos)
 Работает с многострочным текстом s. Строки разделяются EOL - '\n' или '\r\n'.
 Возвращается 2 значения - позиция начала строки и начала следующей строки, либо конца текста s, если строк больше нет.
 
+```
+function array_search(a, v)
+function array_field_search(a, f, v)
+```
+
+Линейный поиск в таблице a значения v. `array_field_search` предполагает, что элемент таблицы a - таблица, поиск идет по полю f.
+
 ## Обслуживание raw string
 
 ### hex
@@ -2358,6 +2366,16 @@ function blob_or_def(desync, name, def)
 Иначе читается переменная name сначала в desync. Если там нет, берется глобальная переменная.
 Если и ее нет, берется значение def. Если name = nil или пустая строка, вызывается error.
 - blob_or_def - возвращает def, если name = nil, иначе аналогично blob
+
+```
+function barray(a, packer)
+```
+
+Упаковка элементов массива a в порядке возрастания индекса от 1 до последнего.
+`packer` - функция, берущая элемент a и возвращающая raw string.
+Для числовых массивов в качестве packer можно использовать [функции паковки чисел](#bux).
+Возвращается raw string.
+
 
 ## Обслуживание tcp sequence numbers
 
@@ -2517,6 +2535,361 @@ function http_dissect_reply(http)
     .pos_end
       number 59
 </pre></details>
+
+### dissect_tls
+
+```
+function tls_dissect(tls, offset, partialOK)
+function tls_reconstruct(tdis)
+```
+
+Разборка и сборка TLS. Что понимают и могут функции :
+
+1. Любой TLS handshake без TLS record (включая client/server hello). Например, взятый из `desync.decrypt_data` от QUIC.
+2. Любые TLS records. Handshake, certificate, change cipher spec и другие.
+3. Резаные handshake на несколько TLS records (например, результат `tpws --tlsrec`)
+4. (только dissect) Неполные блоки данных, если parialOK=true. Восстанавливается максимум возможного, но полноценно собрать уже не выйдет.
+5. Все handshake выносятся в отдельную таблицу. Для client/server hello выполняется диссект, остальные оставляются как raw data field.
+6. TLS extensions из client/server hello : server name, alpn, supported versions, compress certificate, signature algorithms, delegated credentials, supported groups, ec point formats, psk key exchange modes, key share, quic transport parameters. Остальные extensions не парсятся и оставляются как raw data field.
+7. Если есть record layer, реконструкция выполняется согласно длинам отдельных records. Если последняя часть не влезает, tls record расширяется под оставшиеся данные.
+8. При отсутствии изменений dissect+reconstruct дают бинарно идентичные блобы.
+
+Функции не работают с DTLS. В случае ошибки возвращается nil.
+
+Простейший способ получить образец диссекта : `--payload=tls_client_hello --lua-desync=luaexec:code="var_debug(tls_dissect(desync.reasm_data))"`.
+И вызвать TLS запрос.
+
+<details>
+  <summary><b>Пример диссекта TLS от запроса к httsp://google.com</b></summary>
+<pre>
+.rec
+  .1
+    .ver
+      number 769
+    .type
+      number 22
+    .name
+      string handshake
+    .len
+      number 512
+    .encrypted
+      boolean false
+    .htype
+      number 1
+    .data
+      string 01 00 01 FC 03 03 87 36 D1 0E 19 78 8F 8B 41 5E 05 74 92 EF E7 9D 3E 83 F3 9D F4 C4 C6 6C 3E DC 5A 8C EF FD BC B4 20 1C AF 31 7A EB D2 FD 8B 1F C6 E8 DB CF 02 28 93 C4 AE 13 E1 17 ED 62 D8 3D 2F DE 03 67 A1 1A 44 00 3C 13 02 13 03 13 01 C0 2C C0 30 00 9F CC A9 CC A8 CC AA C0 2B C0 2F 00 9E C0 24 C0 28 00 6B C0 23 C0 27 00 67 C0 0A C0 14 00 39 C0 09 C0 13 00 33 00 9D 00 9C 00 3D 00 3C 00 35 00 2F 01 00 01 77 FF 01 00 01 00 00 00 00 0F 00 0D 00 00 0A 67 6F 6F 67 6C 65 2E 63 6F 6D 00 0B 00 04 03 00 01 02 00 0A 00 16 00 14 00 1D 00 17 00 1E 00 19 00 18 01 00 01 01 01 02 01 03 01 04 00 10 00 0E 00 0C 02 68 32 08 68 74 74 70 2F 31 2E 31 00 16 00 00 00 17 00 00 00 31 00 00 00 0D 00 30 00 2E 04 03 05 03 06 03 08 07 08 08 08 1A 08 1B 08 1C 08 09 08 0A 08 0B 08 04 08 05 08 06 04 01 05 01 06 01 03 03 03 01 03 02 04 02 05 02 06 02 00 2B 00 05 04 03 04 03 03 00 2D 00 02 01 01 00 33 00 26 00 24 00 1D 00 20 E0 40 E1 0A BF AD 5B 08 48 16 E5 A6 A9 90 E4 28 A1 67 40 1F AF A4 7B 9B 0A F9 32 2A 01 95 8B 5D 00 15 00 AE 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+.handshake
+  .1
+    .dis
+      .ver
+        number 771
+      .type
+        number 1
+      .name
+        string client_hello
+      .cipher_suites
+        .1
+          number 4866
+        .2
+          number 4867
+        .3
+          number 4865
+        .4
+          number 49196
+        .5
+          number 49200
+        .6
+          number 159
+        .7
+          number 52393
+        .8
+          number 52392
+        .9
+          number 52394
+        .10
+          number 49195
+        .11
+          number 49199
+        .12
+          number 158
+        .13
+          number 49188
+        .14
+          number 49192
+        .15
+          number 107
+        .16
+          number 49187
+        .17
+          number 49191
+        .18
+          number 103
+        .19
+          number 49162
+        .20
+          number 49172
+        .21
+          number 57
+        .22
+          number 49161
+        .23
+          number 49171
+        .24
+          number 51
+        .25
+          number 157
+        .26
+          number 156
+        .27
+          number 61
+        .28
+          number 60
+        .29
+          number 53
+        .30
+          number 47
+      .compression_methods
+        .1
+          number 0
+      .ext
+        .1
+          .type
+            number 65281
+          .name
+            string renegotiation_info
+          .data
+            string 00
+        .2
+          .dis
+            .list
+              .1
+                .name
+                  string google.com
+                .type
+                  number 0
+          .type
+            number 0
+          .name
+            string server_name
+          .data
+            string 00 0D 00 00 0A 67 6F 6F 67 6C 65 2E 63 6F 6D
+        .3
+          .dis
+            .list
+              .1
+                number 0
+              .2
+                number 1
+              .3
+                number 2
+          .type
+            number 11
+          .name
+            string ec_point_formats
+          .data
+            string 03 00 01 02
+        .4
+          .dis
+            .list
+              .1
+                number 29
+              .2
+                number 23
+              .3
+                number 30
+              .4
+                number 25
+              .5
+                number 24
+              .6
+                number 256
+              .7
+                number 257
+              .8
+                number 258
+              .9
+                number 259
+              .10
+                number 260
+          .type
+            number 10
+          .name
+            string supported_groups
+          .data
+            string 00 14 00 1D 00 17 00 1E 00 19 00 18 01 00 01 01 01 02 01 03 01 04
+        .5
+          .dis
+            .list
+              .1
+                string h2
+              .2
+                string http/1.1
+          .type
+            number 16
+          .name
+            string application_layer_protocol_negotiation
+          .data
+            string 00 0C 02 68 32 08 68 74 74 70 2F 31 2E 31
+        .6
+          .type
+            number 22
+          .name
+            string encrypt_then_mac
+          .data
+            string
+        .7
+          .type
+            number 23
+          .name
+            string extended_master_secret
+          .data
+            string
+        .8
+          .type
+            number 49
+          .name
+            string post_handshake_auth
+          .data
+            string
+        .9
+          .dis
+            .list
+              .1
+                number 1027
+              .2
+                number 1283
+              .3
+                number 1539
+              .4
+                number 2055
+              .5
+                number 2056
+              .6
+                number 2074
+              .7
+                number 2075
+              .8
+                number 2076
+              .9
+                number 2057
+              .10
+                number 2058
+              .11
+                number 2059
+              .12
+                number 2052
+              .13
+                number 2053
+              .14
+                number 2054
+              .15
+                number 1025
+              .16
+                number 1281
+              .17
+                number 1537
+              .18
+                number 771
+              .19
+                number 769
+              .20
+                number 770
+              .21
+                number 1026
+              .22
+                number 1282
+              .23
+                number 1538
+          .type
+            number 13
+          .name
+            string signature_algorithms
+          .data
+            string 00 2E 04 03 05 03 06 03 08 07 08 08 08 1A 08 1B 08 1C 08 09 08 0A 08 0B 08 04 08 05 08 06 04 01 05 01 06 01 03 03 03 01 03 02 04 02 05 02 06 02
+        .10
+          .dis
+            .list
+              .1
+                number 772
+              .2
+                number 771
+          .type
+            number 43
+          .name
+            string supported_versions
+          .data
+            string 04 03 04 03 03
+        .11
+          .dis
+            .list
+              .1
+                number 1
+          .type
+            number 45
+          .name
+            string psk_key_exchange_modes
+          .data
+            string 01 01
+        .12
+          .dis
+            .list
+              .1
+                .group
+                  number 29
+                .kex
+                  string E0 40 E1 0A BF AD 5B 08 48 16 E5 A6 A9 90 E4 28 A1 67 40 1F AF A4 7B 9B 0A F9 32 2A 01 95 8B 5D
+          .type
+            number 51
+          .name
+            string key_share
+          .data
+            string 00 24 00 1D 00 20 E0 40 E1 0A BF AD 5B 08 48 16 E5 A6 A9 90 E4 28 A1 67 40 1F AF A4 7B 9B 0A F9 32 2A 01 95 8B 5D
+        .13
+          .type
+            number 21
+          .name
+            string padding
+          .data
+            string 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+      .session_id
+        string 1C AF 31 7A EB D2 FD 8B 1F C6 E8 DB CF 02 28 93 C4 AE 13 E1 17 ED 62 D8 3D 2F DE 03 67 A1 1A 44
+      .random
+        string 87 36 D1 0E 19 78 8F 8B 41 5E 05 74 92 EF E7 9D 3E 83 F3 9D F4 C4 C6 6C 3E DC 5A 8C EF FD BC B4
+    .type
+      number 1
+    .name
+      string client_hello
+    .data
+      string 01 00 01 FC 03 03 87 36 D1 0E 19 78 8F 8B 41 5E 05 74 92 EF E7 9D 3E 83 F3 9D F4 C4 C6 6C 3E DC 5A 8C EF FD BC B4 20 1C AF 31 7A EB D2 FD 8B 1F C6 E8 DB CF 02 28 93 C4 AE 13 E1 17 ED 62 D8 3D 2F DE 03 67 A1 1A 44 00 3C 13 02 13 03 13 01 C0 2C C0 30 00 9F CC A9 CC A8 CC AA C0 2B C0 2F 00 9E C0 24 C0 28 00 6B C0 23 C0 27 00 67 C0 0A C0 14 00 39 C0 09 C0 13 00 33 00 9D 00 9C 00 3D 00 3C 00 35 00 2F 01 00 01 77 FF 01 00 01 00 00 00 00 0F 00 0D 00 00 0A 67 6F 6F 67 6C 65 2E 63 6F 6D 00 0B 00 04 03 00 01 02 00 0A 00 16 00 14 00 1D 00 17 00 1E 00 19 00 18 01 00 01 01 01 02 01 03 01 04 00 10 00 0E 00 0C 02 68 32 08 68 74 74 70 2F 31 2E 31 00 16 00 00 00 17 00 00 00 31 00 00 00 0D 00 30 00 2E 04 03 05 03 06 03 08 07 08 08 08 1A 08 1B 08 1C 08 09 08 0A 08 0B 08 04 08 05 08 06 04 01 05 01 06 01 03 03 03 01 03 02 04 02 05 02 06 02 00 2B 00 05 04 03 04 03 03 00 2D 00 02 01 01 00 33 00 26 00 24 00 1D 00 20 E0 40 E1 0A BF AD 5B 08 48 16 E5 A6 A9 90 E4 28 A1 67 40 1F AF A4 7B 9B 0A F9 32 2A 01 95 8B 5D 00 15 00 AE 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+</pre>
+</details>
+
+Элементы, которые удалось разобрать, представлены в виде подтаблиц dis. Остальные остаются как raw data field.
+Для некторых диссектов заполняется поле "name". Оно служит для удобства визуального анализа и больше ни для чего не используется.
+Первичными являются поля type.
+
+Для нахождения значений в списках используйте [функции поиска в массивах](#служебные-функции).
+
+Множество констант, связанных с TLS, определено в `zapret-lib.lua`. Прежде чем писать фиксированные значения, посмотрите нет ли нужной константы.
+
+Таблица handshake индексируется по типу hadnshake. Самыми типичными являются `TLS_HANDSHAKE_TYPE_CLIENT` и `TLS_HANDSHAKE_TYPE_SERVER`.
+Они имеют значения 1 и 2 соответственно, поэтому может показаться, что элементы handshake идут от 1 и по возрастающей. Это не так.
+
+Если вы что-то добавляете свое, вам нужно воспроизвести минимальный вариант исходной структуры.
+Можно заполнить только raw data field. Если нет подтаблицы dis - при реконструкции будет взято оно.
+Если есть dis, то он должен быть заполнен корректно согласно рассматриваемому элементу данных.
+
+Следущий пример кода ищет SNI extension в диссекте tdis, а в случае отсутствия добавляет в начало. Затем добавляется домен "example.com".
+
+```
+	local idx_sni = array_field_search(tdis.handshake[TLS_HANDSHAKE_TYPE_CLIENT].dis.ext, "type", TLS_EXT_SERVER_NAME)
+	if not idx_sni then
+		table.insert(tdis.handshake[TLS_HANDSHAKE_TYPE_CLIENT].dis.ext, 1, { type = TLS_EXT_SERVER_NAME, dis = { list = {} } } )
+		idx_sni = 1
+	end
+	table.insert(tdis.handshake[TLS_HANDSHAKE_TYPE_CLIENT].dis.ext[idx_sni].dis.list, { name = "example.com", type = 0 } )
+```
+
 
 ## Работа с элементами L3 и L4 протоколов
 
@@ -3139,6 +3512,34 @@ function syndata(ctx, desync)
 Таким образом воздействие выполняется на все ретрансмиссии SYN, после чего функция прекращает работу.
 Является стратегией нулевой фазы, которая работает с хостлистами только в режиме `--ipcache-hostname`.
 
+### tls_client_hello_clone
+
+```
+function tls_client_hello_clone(ctx, desync)
+```
+
+- arg: [standard direction](#standard-direction)
+- arg: blob - имя блоба, получающего результат
+- arg: sni_del_ext - удалить sni extension. остальные параметры не Используются
+- arg: sni_del - удалить все хосты
+- arg: sni_snt - заменить на всех уже имеющихся хостах поле "server name type"
+- arg: sni_snt_new - поле "server name type" для добавляемых хостов
+- arg: sni_first - добавить хост в начало списка
+- arg: sni_last - добавить хост в конец списка списка
+
+Подготавливает blob с указанным именем в таблице desync, заполненный результатом модификации текущего [reasm](#особенности-приема-многопакетных-пейлоадов).
+Работает только с tcp и пейлоадом tls_client_hello.
+
+Очередность выполнения операций :
+
+1. sni_del_ext . Все остальные операции со SNI теряют смысл и не выполнятся.
+1. sni_del
+2. sni_snt
+3. sni_first
+4. sni_last
+
+Сама по себе эта функция никак не влияет на трафик, а лишь подготавливает данные для других функций.
+
 ### fake
 
 ```
@@ -3153,6 +3554,7 @@ function fake(ctx, desync)
 - arg: [standard reconstruct](#standard-reconstruct)
 - arg: [standard rawsend](#standard-rawsend)
 - arg: blob - blob, содержащий фейковый payload. Может быть любой длины - сегментация выполняется автоматически.
+- arg: optional - отказ от операции, если blob отсутствует
 - arg: tls_mod - применить указанный tls_mod к пейлоаду blob
 - payload фильтр по умолчанию - "known"
 
@@ -3195,6 +3597,7 @@ function multisplit(ctx, desync)
 - arg: seqovl - число - смещение относительно текущего sequence для создания дополнительной части сегмента, выходящей влево за границу tcp window
 - arg: seqovl_pattern - [blob](#передача-блобов), используемый для заполнения seqovl. По умолчанию 0x00
 - arg: blob - заменить текущий пейлоад на указанный [blob](#передача-блобов)
+- arg: optional - отказ от операции, если blob задан, но отсутствует. если seqovl_pattern задан, но отсутствует, использовать паттерн 0x00.
 - arg: nodrop - отказ от вынесения VERDICT_DROP
 - payload фильтр по умолчанию - "known"
 
@@ -3230,6 +3633,7 @@ function multidisorder(ctx, desync)
 - arg: seqovl - маркер - смещение относительно текущего sequence для создания дополнительной части сегмента, выходящей влево
 - arg: seqovl_pattern - [blob](#передача-блобов), используемый для заполнения seqovl. По умолчанию 0x00
 - arg: blob - заменить текущий пейлоад на указанный [blob](#передача-блобов)
+- arg: optional - отказ от операции, если blob задан, но отсутствует. если seqovl_pattern задан, но отсутствует, использовать паттерн 0x00.
 - arg: nodrop - отказ от вынесения VERDICT_DROP
 - payload фильтр по умолчанию - "known"
 
@@ -3258,6 +3662,7 @@ function multidisorder_legacy(ctx, desync)
 - arg: [standard rawsend](#standard-rawsend)
 - arg: pos - список [маркеров](#маркеры) через запятую - точек разреза. По умолчанию "2".
 - arg: seqovl - маркер - смещение относительно текущего sequence для создания дополнительной части сегмента, выходящей влево
+- arg: optional - отказ от операции, если blob задан, но отсутствует. если seqovl_pattern задан, но отсутствует, использовать паттерн 0x00.
 - arg: seqovl_pattern - [blob](#передача-блобов), используемый для заполнения seqovl. По умолчанию 0x00
 
 Реализация multidisorder, полностью совместимая с nfqws1.
@@ -3282,6 +3687,7 @@ function fakedsplit(ctx, desync)
 - arg: seqovl - число - смещение относительно текущего sequence для создания дополнительной части сегмента, выходящей влево за границу tcp window
 - arg: seqovl_pattern - [blob](#передача-блобов), используемый для заполнения seqovl. По умолчанию 0x00
 - arg: blob - заменить текущий пейлоад на указанный [blob](#передача-блобов)
+- arg: optional - отказ от операции, если blob задан, но отсутствует. если seqovl_pattern задан, но отсутствует, использовать паттерн 0x00.
 - arg: nodrop - отказ от вынесения VERDICT_DROP
 - arg: nofake1, nofake2, nofake3, nofake4 - отказ от отсылки отдельных фейков
 - arg: pattern - [blob](#передача-блобов), которым заполняются фейковые части. По умолчанию 0x00.
@@ -3324,6 +3730,7 @@ function fakeddisorder(ctx, desync)
 - arg: seqovl - [маркер](#маркеры) - смещение относительно текущего sequence для создания дополнительной части сегмента, выходящей влево
 - arg: seqovl_pattern - [blob](#передача-блобов), используемый для заполнения seqovl. По умолчанию 0x00
 - arg: blob - заменить текущий пейлоад на указанный [blob](#передача-блобов)
+- arg: optional - отказ от операции, если blob задан, но отсутствует. если seqovl_pattern задан, но отсутствует, использовать паттерн 0x00.
 - arg: nodrop - отказ от вынесения VERDICT_DROP
 - arg: nofake1, nofake2, nofake3, nofake4 - отказ от отсылки отдельных фейков
 - arg: pattern - [blob](#передача-блобов), которым заполняются фейковые части. По умолчанию 0x00.
@@ -3367,6 +3774,7 @@ function hostfakesplit(ctx, desync)
 - arg: disorder_after - [маркер](#маркеры) для дополнительного разреза заключительной реальной части и отправки сегментов в обратном порядке
 - arg: nofake, nofake2 - отказ от отсылки отдельных фейков
 - arg: blob - заменить текущий пейлоад на указанный [blob](#передача-блобов)
+- arg: optional - отказ от операции, если blob задан, но отсутствует
 - arg: nodrop - отказ от вынесения VERDICT_DROP
 - payload фильтр по умолчанию - "known"
 
@@ -3406,6 +3814,7 @@ function tcpseg(ctx, desync)
 - arg: seqovl - число - смещение относительно текущего sequence для создания дополнительной части сегмента, выходящей влево за границу tcp window
 - arg: seqovl_pattern - [blob](#передача-блобов), используемый для заполнения seqovl. По умолчанию 0x00
 - arg: blob - заменить текущий пейлоад на указанный [blob](#передача-блобов)
+- arg: optional - отказ от операции, если blob задан, но отсутствует. если seqovl_pattern задан, но отсутствует, использовать паттерн 0x00.
 - payload фильтр по умолчанию - "known"
 
 Отсылает часть текущего диссекта, [реасма](#особенности-приема-многопакетных-пейлоадов), или произвольного blob, ограниченную двумя [маркерами](#маркеры) pos с опциональным применением техники seqovl таким же способом, как и в [multisplit](#multisplit). Дополнительная сегментация при превышении MSS производится автоматически.
