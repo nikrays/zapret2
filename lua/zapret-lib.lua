@@ -1776,11 +1776,12 @@ TLS_HANDSHAKE_QUIC_TP_NAMES = {
 }
 
 
-
+-- tls record length without header
 function tls_record_data_len(tls, offset)
 	if not offset then offset=1 end
 	return u16(tls, offset+3)
 end
+-- true if tls has enough data to store the whole tls record
 function tls_record_full(tls, offset)
 	if not offset then offset=1 end
 	return tls_record_data_len(tls, offset) <= (#tls-offset+1-5)
@@ -1798,13 +1799,16 @@ function is_tls_record(tls, offset, ctype, partialOK)
 	return f2>=TLS_VER_SSL30 and f2<=TLS_VER_TLS12 and (partialOK or tls_record_full(tls, offset))
 
 end
+-- tls handshake record length without header
 function tls_handshake_data_len(tls, offset)
 	if not offset then offset=1 end
 	return u24(tls, offset+1)
 end
+-- tls handshake record length with header
 function tls_handshake_len(tls, offset)
 	return tls_handshake_data_len(tls, offset) + 4
 end
+-- true if tls has enough data to store the whole handshake
 function tls_handshake_full(tls, offset)
 	if not offset then offset=1 end
 	return tls_handshake_data_len(tls, offset) <= (#tls-offset+1-4)
@@ -1839,6 +1843,7 @@ end
 function is_tls_hello(tls, offset, partialOK)
 	return is_tls_handshake(tls, offset, TLS_HANDSHAKE_TYPE_CLIENT, partialOK) or is_tls_handshake(tls, offset, TLS_HANDSHAKE_TYPE_SERVER, partialOK)
 end
+-- quic-style tvb parse
 function quic_tvb(data, offset)
 	if not offset then offset=1 end
 	if offset>#data then return end
@@ -1857,6 +1862,7 @@ function quic_tvb(data, offset)
 		return bitand(u32(data,offset),0x3FFFFFFF) * 0x100000000 + u32(data,offset+4), 8
 	end
 end
+-- quic-style tvb reconstruct
 function bquic_tvb(v)
 	if v<0x40 then
 		return bu8(v)
@@ -1871,6 +1877,8 @@ function bquic_tvb(v)
 end
 
 
+-- dissect tls extension
+-- create dis tables inside ext for supported exts. leave 'data' as is for unsupported exts
 function tls_dissect_ext(ext)
 	local function len16_header()
 		local left, len, off
@@ -2002,6 +2010,7 @@ function tls_dissect_ext(ext)
 	ext.dis = dis
 end
 
+-- dissect client/server hello. leave 'data' as is for others
 function tls_dissect_handshake(handshake, partialOK)
 	if is_tls_hello(handshake.data, 1, partialOK) then
 		local hlen = tls_handshake_len(handshake.data, 1)
@@ -2150,6 +2159,8 @@ function tls_dissect(tls, offset, partialOK)
 end
 
 
+-- reconstruct tls extension dissects
+-- unsupported ext types must have their 'data' filled
 function tls_reconstruct_ext(ext)
 	if ext.dis then
 		if ext.type==TLS_EXT_SERVER_NAME then
@@ -2183,6 +2194,8 @@ function tls_reconstruct_ext(ext)
 	return type(ext.data)=="string"
 end
 
+-- reconstruct handshake dissect to raw string
+-- deeper dissects are supported for client/server hello, others must have 'data' field
 function tls_reconstruct_handshake(handshake)
 	if handshake.dis then
 		if handshake.dis.type == TLS_HANDSHAKE_TYPE_CLIENT or handshake.dis.type == TLS_HANDSHAKE_TYPE_SERVER then
@@ -2219,6 +2232,9 @@ function tls_reconstruct_handshake(handshake)
 	return type(handshake.data)=="string"
 end
 
+-- recconstruct tls dissect to raw tls
+-- supports tls records with optional handshake dissects
+-- supports single handshake without tls records
 function tls_reconstruct(tdis)
 	if tdis.handshake then
 		for htyp, handshake in pairs(tdis.handshake) do
