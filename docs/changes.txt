@@ -143,3 +143,4 @@ v0.8.0
 * zapret-lib: tls dissector/reconstructor
 * zapret-antidpi: tls_client_hello_clone
 * zapret-antidpi: "optional" arg to blob taking functions
+* nfqws2: support gzipped lua file. auto use script.lua.gz

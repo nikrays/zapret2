@@ -61,7 +61,7 @@ bool AppendHostList(hostlist_pool **hostlist, const char *filename)
 
 	if (is_gzip(F))
 	{
-		r = z_readfile(F,&zbuf,&zsize);
+		r = z_readfile(F,&zbuf,&zsize,0);
 		fclose(F);
 		if (r==Z_OK)
 		{

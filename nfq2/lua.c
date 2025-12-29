@@ -13,6 +13,7 @@
 
 #include "lua.h"
 #include "params.h"
+#include "gzip.h"
 #include "helpers.h"
 #include "conntrack.h"
 #include "crypto/sha.h"
@@ -2899,17 +2900,43 @@ static bool lua_desync_functions_exist()
 	return true;
 }
 
+static bool lua_file_open_test(const char *filename, bool *b_gzip, char *fname)
+{
+	FILE *F = fopen(filename,"rb");
+	if (F)
+	{
+		if (fname) snprintf(fname,PATH_MAX,"%s",filename);
+	}
+	else
+	{
+		size_t l = strlen(filename);
+		char *fngz = malloc(l+4);
+		if (!fngz) return false;
+		memcpy(fngz, filename, l);
+		memcpy(fngz+l,".gz",4);
+		if (fname) snprintf(fname,PATH_MAX,"%s",fngz);
+		F = fopen(fngz,"rb");
+		free(fngz);
+	}
+	if (F)
+	{
+		if (b_gzip) *b_gzip = is_gzip(F);
+		fclose(F);
+	}
+	return !!F;
+}
+
 bool lua_test_init_script_files(void)
 {
 	struct str_list *str;
 	LIST_FOREACH(str, &params.lua_init_scripts, next)
 	{
-		if (str->str[0]=='@' && !file_open_test(str->str+1, O_RDONLY))
+		if (str->str[0]=='@' && !lua_file_open_test(str->str+1, NULL, NULL))
 		{
 #ifndef __CYGWIN__
 			int e = errno;
 #endif
-			DLOG_ERR("LUA file '%s' not accessible\n", str->str+1);
+			DLOG_ERR("LUA file '%s' or '%s.gz' not accessible\n", str->str+1, str->str+1);
 #ifndef __CYGWIN__
 			if (e==EACCES)
 				DLOG_ERR("I drop my privileges and do not run Lua as root\ncheck file permissions and +x rights on all directories in the path\n");
@@ -2918,6 +2945,33 @@ bool lua_test_init_script_files(void)
 		}
 	}
 	return true;
+}
+
+static int luaL_doZfile(lua_State *L, const char *filename)
+{
+	bool b_gzip;
+	char fname[PATH_MAX];
+	if (!lua_file_open_test(filename, &b_gzip, fname))
+		luaL_error(L, "could not open lua file '%s' or '%s.gz'", filename, filename);
+	if (b_gzip)
+	{
+		size_t size;
+		char *buf;
+		int r;
+		FILE *F = fopen(fname, "rb");
+		if (!F)
+			luaL_error(L, "could not open lua file '%s'", fname);
+		r = z_readfile(F, &buf, &size, 1);
+		fclose(F);
+		if (r != Z_OK)
+			luaL_error(L, "could not unzip lua file '%s'", fname);
+		buf[size] = 0;
+		r = luaL_dostring(L, buf);
+		free(buf);
+		return r;
+	}
+	else
+		return luaL_dofile(L, filename);
 }
 
 static bool lua_init_scripts(void)
@@ -2938,7 +2992,7 @@ static bool lua_init_scripts(void)
 				DLOG("LUA RUN STR: %s\n",s);
 			}
 		}
-		if ((status = str->str[0]=='@' ? luaL_dofile(params.L, str->str+1) : luaL_dostring(params.L, str->str)))
+		if ((status = str->str[0]=='@' ? luaL_doZfile(params.L, str->str+1) : luaL_dostring(params.L, str->str)))
 		{
 			lua_perror(params.L);
 			return false;

@@ -7,7 +7,7 @@
 #define BUFMIN 128
 #define BUFCHUNK (1024*128)
 
-int z_readfile(FILE *F, char **buf, size_t *size)
+int z_readfile(FILE *F, char **buf, size_t *size, size_t extra_alloc)
 {
 	z_stream zs;
 	int r;
@@ -38,7 +38,7 @@ int z_readfile(FILE *F, char **buf, size_t *size)
 			if ((bufsize - *size) < BUFMIN)
 			{
 				bufsize += BUFCHUNK;
-				newbuf = *buf ? realloc(*buf, bufsize) : malloc(bufsize);
+				newbuf = *buf ? realloc(*buf, bufsize + extra_alloc) : malloc(bufsize + extra_alloc);
 				if (!newbuf)
 				{
 					r = Z_MEM_ERROR;
@@ -57,7 +57,7 @@ int z_readfile(FILE *F, char **buf, size_t *size)
 	if (*size < bufsize)
 	{
 		// free extra space
-		if ((newbuf = realloc(*buf, *size))) *buf = newbuf;
+		if ((newbuf = realloc(*buf, *size + extra_alloc))) *buf = newbuf;
 	}
 
 	inflateEnd(&zs);
