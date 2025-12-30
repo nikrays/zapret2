@@ -2967,6 +2967,7 @@ static int luaL_doZfile(lua_State *L, const char *filename)
 			luaL_error(L, "could not unzip lua file '%s'", fname);
 		r = luaL_loadbuffer(L, buf, size, fname);
 		free(buf);
+		if (!r) r=lua_pcall(L, 0, LUA_MULTRET, 0);
 		return r;
 	}
 	else
