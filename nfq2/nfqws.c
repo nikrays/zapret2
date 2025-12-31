@@ -2228,7 +2228,7 @@ int main(int argc, char **argv)
 				DLOG_ERR("Invalid port filter : %s\n", optarg);
 				exit_clean(1);
 			}
-			// deny tcp if not set
+			// deny udp if not set
 			if (!port_filters_deny_if_empty(&dp->pf_udp))
 				exit_clean(1);
 			break;
