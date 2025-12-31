@@ -2870,11 +2870,35 @@ static bool lua_basic_init()
 #else
 	DLOG_CONDUP("LUA v%u.%u\n",ver/100,ver%100);
 #endif
+
 #if LUA_VERSION_NUM >= 504
 	lua_setwarnf(params.L,lua_warn,NULL);
 #endif
 	lua_atpanic(params.L,lua_panic);
 	luaL_openlibs(params.L); /* Load Lua libraries */
+
+	lua_getfield(params.L, LUA_REGISTRYINDEX, "_LOADED");
+	if (lua_type(params.L, -1)==LUA_TTABLE)
+	{
+		lua_getfield(params.L, -1, "jit");
+		if (lua_type(params.L, -1)==LUA_TTABLE)
+		{
+			lua_getfield(params.L, -1, "status");
+			if (lua_type(params.L, -1)==LUA_TFUNCTION)
+			{
+				const char *s;
+				int n = lua_gettop(params.L);
+
+				lua_call(params.L, 0, LUA_MULTRET);
+				DLOG_CONDUP(lua_toboolean(params.L, n) ? "JIT: ON" : "JIT: OFF");
+				for (n++; (s = lua_tostring(params.L, n)); n++)
+					DLOG_CONDUP(" %s", s);
+				DLOG_CONDUP("\n");
+			}
+		}
+	}
+	lua_settop(params.L, 0);
+
 	return true;
 }
 
