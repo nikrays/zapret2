@@ -51,7 +51,7 @@
 #define MAX_CONFIG_FILE_SIZE 16384
 
 struct params_s params;
-static bool bReload = false;
+static volatile sig_atomic_t bReload = false;
 #ifdef __CYGWIN__
 bool bQuit = false;
 #endif
@@ -1490,10 +1490,6 @@ void config_from_file(const char *filename)
 }
 #endif
 
-static void check_dp(const struct desync_profile *dp)
-{
-}
-
 static void ApplyDefaultBlobs(struct blob_collection_head *blobs)
 {
 	load_const_blob_to_collection("fake_default_tls",fake_tls_clienthello_default,sizeof(fake_tls_clienthello_default),blobs,BLOB_EXTRA_BYTES);
@@ -2131,7 +2127,6 @@ int main(int argc, char **argv)
 			}
 			else
 			{
-				check_dp(dp);
 				if (bTemplate)
 				{
 					if (dp->name && dp_list_search_name(&params.desync_templates, dp->name))
@@ -2472,7 +2467,6 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-		check_dp(dp);
 		if (bTemplate)
 		{
 			if (dp->name && dp_list_search_name(&params.desync_templates, dp->name))

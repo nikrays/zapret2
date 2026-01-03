@@ -52,7 +52,7 @@ nft_flush_chain()
 nft_chain_empty()
 {
 	# $1 - chain name
-	local count=$(nft list chain inet $ZAPRET_NFT_TABLE prerouting | wc -l)
+	local count=$(nft list chain inet $ZAPRET_NFT_TABLE $1 | wc -l)
 	[ "$count" -le 4 ]
 }
 nft_rule_exists()

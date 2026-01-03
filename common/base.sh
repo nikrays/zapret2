@@ -185,8 +185,7 @@ is_linked_to_busybox()
 			[ "${P%busybox*}" != "$P" ] && return
 		elif [ -f "$F" -a -n "$BB" ]; then
 			# possible hardlink
-			[ $(get_dir_inode "$F") = $(get_dir_inode "$BB") ]
-			return
+			[ $(get_dir_inode "$F") = $(get_dir_inode "$BB") ] && return
 		fi
 	done
 	return 1
