@@ -2681,7 +2681,7 @@ static int luacall_gunzip_inflate(lua_State *L)
 		size = bufsize - uzs->zs.avail_out;
 	} while (r == Z_OK && uzs->zs.avail_in);
 
-	lua_pushlstring(L, buf, size);
+	lua_pushlstring(L, (const char*)buf, size);
 	lua_pushboolean(L, r==Z_STREAM_END);
 end:
 	free(buf);
@@ -2785,7 +2785,7 @@ static int luacall_gzip_deflate(lua_State *L)
 		size = bufsize - uzs->zs.avail_out;
 	} while (r == Z_OK && (uzs->zs.avail_in || !uzs->zs.avail_out));
 
-	lua_pushlstring(L, buf, size);
+	lua_pushlstring(L, (const char*)buf, size);
 	lua_pushboolean(L, r==Z_STREAM_END);
 end:
 	free(buf);
