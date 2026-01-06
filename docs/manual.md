@@ -1942,12 +1942,12 @@ function gunzip_inflate(zstream, compressed_data, expected_uncompressed_chunk_si
 ```
 function gzip_init(windowBits, level, memlevel)
 function gzip_end(zstream)
-function gzip_inflate(zstream, compressed_data, expected_uncompressed_chunk_size)
+function gzip_inflate(zstream, uncompressed_data, expected_compressed_chunk_size)
 ```
 
 * gunzip_init создает и возвращает контекст gzip потока для последующих вызовов других функций. Значение windowBits см. в документации по zlib (по умолчанию 31). level - уровень сжатия от 1 до 9 (по умолчанию 9), memlevel - допустимый уровень использования памяти от 1 до 8 (по умолчанию 8).
 * gunzip_end освобождает контекст gzip. **ВАЖНО !** gzip_end должен быть вызван всегда после окончания использования потока, иначе это приведет к memory leaks !!
-* gunzip_deflate cжимает очередную часть данных. Данные можно скармливать частями. Cжатые части конкатенируются для получения полных данных. Для финализации потока по окончанию скармливания данных функция должна быть вызвана с data=nil или data="". Возвращается 2 аргумента : сжатые данные и bool признак конца gzip. При ошибках gzip или нехватке памяти возвращается nil.
+* gunzip_deflate cжимает очередную часть данных. Данные можно скармливать частями. Cжатые части конкатенируются для получения полных данных. Для финализации потока по окончанию скармливания данных функция должна быть вызвана с uncompressed_data=nil или uncompressed_data="". Возвращается 2 аргумента : сжатые данные и bool признак конца gzip. При ошибках gzip или нехватке памяти возвращается nil.
 
 
 ### Системные функции
