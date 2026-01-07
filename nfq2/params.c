@@ -496,6 +496,8 @@ void cleanup_params(struct params_s *params)
 	hostlist_files_destroy(&params->hostlists);
 	ipset_files_destroy(&params->ipsets);
 	ipcacheDestroy(&params->ipcache);
+	blob_collection_destroy(&params->blobs);
+	strlist_destroy(&params->lua_init_scripts);
 #ifdef __CYGWIN__
 	strlist_destroy(&params->ssid_filter);
 	strlist_destroy(&params->nlm_filter);
