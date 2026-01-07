@@ -1732,7 +1732,6 @@ int main(int argc, char **argv)
 
 	srandom(time(NULL));
 	aes_init_keygen_tables(); // required for aes
-	mask_from_preflen6_prepare();
 	set_env_exedir(argv[0]);
 	set_console_io_buffering();
 #ifdef __CYGWIN__
