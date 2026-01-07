@@ -2668,6 +2668,8 @@ static int luacall_gunzip_end(lua_State *L)
 	LUA_STACK_GUARD_RETURN(L,0)
 }
 #define BUFMIN 128
+#define Z_INFL_BUF_INCREMENT	16384
+#define Z_DEFL_BUF_INCREMENT	4096
 static int luacall_gunzip_inflate(lua_State *L)
 {
 	// gunzip_inflate(zstream, compressed_data, expected_uncompressed_chunk_size) return decompressed_data
@@ -2689,8 +2691,16 @@ static int luacall_gunzip_inflate(lua_State *L)
 	{
 		if ((bufsize - size) < BUFMIN)
 		{
-			bufsize += bufchunk;
-			newbuf = buf ? realloc(buf, bufsize) : malloc(bufsize);
+			if (buf)
+			{
+				bufsize += Z_INFL_BUF_INCREMENT;
+				newbuf = realloc(buf, bufsize);
+			}
+			else
+			{
+				bufsize += bufchunk;
+				newbuf = malloc(bufsize);
+			}
 			if (!newbuf)
 			{
 				r = Z_MEM_ERROR;
@@ -2793,8 +2803,16 @@ static int luacall_gzip_deflate(lua_State *L)
 	{
 		if ((bufsize - size) < BUFMIN)
 		{
-			bufsize += bufchunk;
-			newbuf = buf ? realloc(buf, bufsize) : malloc(bufsize);
+			if (buf)
+			{
+				bufsize += Z_DEFL_BUF_INCREMENT;
+				newbuf = realloc(buf, bufsize);
+			}
+			else
+			{
+				bufsize += bufchunk;
+				newbuf = malloc(bufsize);
+			}
 			if (!newbuf)
 			{
 				r = Z_MEM_ERROR;
