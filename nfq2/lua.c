@@ -2685,7 +2685,7 @@ static int luacall_gunzip_inflate(lua_State *L)
 	struct userdata_zs *uzs = lua_uzs(L, 1, true);
 	uzs->zs.next_in = (z_const Bytef*)luaL_checklstring(L,2,&l);
 	uzs->zs.avail_in = (uInt)l;
-	size_t bufchunk = argc>=3 ? luaL_checkinteger(L,3) : l*4;
+	size_t bufchunk = argc>=3 ? luaL_checkinteger(L,3) : l*3;
 
 	do
 	{
@@ -2797,7 +2797,7 @@ static int luacall_gzip_deflate(lua_State *L)
 		uzs->zs.next_in = (z_const Bytef*)luaL_checklstring(L,2,&l);
 		uzs->zs.avail_in = (uInt)l;
 	}
-	size_t bufchunk = argc>=3 ? luaL_checkinteger(L,3) : 1+l/4;
+	size_t bufchunk = argc>=3 ? luaL_checkinteger(L,3) : 1+l/3;
 
 	do
 	{
