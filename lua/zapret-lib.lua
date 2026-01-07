@@ -1520,8 +1520,9 @@ function readfile(filename)
 	return s
 end
 -- reads plain or gzipped file with transparent decompression
-function z_readfile(filename)
-	return is_gzip_file(filename) and gunzip_file(filename) or readfile(filename)
+-- expected_ratio = uncompressed_size/compressed_size (default 4)
+function z_readfile(filename, expected_ratio)
+	return is_gzip_file(filename) and gunzip_file(filename, expected_ratio) or readfile(filename)
 end
 -- write data to filename
 function writefile(filename, data)

@@ -3067,10 +3067,11 @@ function readfile(filename)
 Читает весь файл. Вызывается error в случае ошибки при открытии или чтении файла.
 
 ```
-function z_readfile(filename)
+function z_readfile(filename, expected_ratio)
 ```
 
 Автоматически определяет является ли файл gzip. Если да - расжимает, если нет - читает без изменений. Вызывается error в случае ошибки при открытии или чтении файла.
+expected_ratio - ожидаемое соотношение длины разжатых данных к длине сжатых данных (по умолчанию 4).
 
 ```
 function writefile(filename, data)
