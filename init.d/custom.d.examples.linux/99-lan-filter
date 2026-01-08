@@ -110,7 +110,7 @@ zapret_custom_firewall_nft()
 	fi
 
 	[ "$DISABLE_IPV4" != 1 ] && {
-	        make_comma_list subnets $FILTER_LAN_IP
+		make_comma_list subnets $FILTER_LAN_IP
 		nft_create_set $FILTER_LAN_SET "type ipv4_addr; size $FILTER_LAN_IPSET_SIZE; auto-merge; flags interval;"
 		nft_flush_set $FILTER_LAN_SET
 		nft_add_set_element $FILTER_LAN_SET "$subnets"
@@ -120,7 +120,7 @@ zapret_custom_firewall_nft()
 		nft_add_rule forward_lan_filter $rule
 	}
 	[ "$DISABLE_IPV6" != 1 ] && {
-	        make_comma_list subnets $FILTER_LAN_IP6
+		make_comma_list subnets $FILTER_LAN_IP6
 		nft_create_set $FILTER_LAN_SET6 "type ipv6_addr; size $FILTER_LAN_IPSET_SIZE; auto-merge; flags interval;"
 		nft_flush_set $FILTER_LAN_SET6
 		nft_add_set_element $FILTER_LAN_SET6 "$subnets"
