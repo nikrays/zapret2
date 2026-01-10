@@ -1,5 +1,16 @@
 # This manual is mostly AI translated from russian
 
+# Donations
+
+Are welcome here :
+
+USDT `0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E`  (ERC-20 preferred)
+
+BTC  `bc1qhqew3mrvp47uk2vevt5sctp7p2x9m7m5kkchve`
+
+ETH  `0x3d52Ce15B7Be734c53fc9526ECbAB8267b63d66E`
+
+
 # Contents
 
 - [Introduction](#introduction)
