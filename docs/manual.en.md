@@ -6,12 +6,12 @@
 - [Project structure](#project-structure)
 - [Traffic processing scheme](#traffic-processing-scheme)
 - [Traffic interception from the OS Kernel](#traffic-interception-from-the-os-kernel)
-  - [Traffic interception in the Linux Kernel](#traffic-interception-in-the-linux-kernel)
+  - [Traffic interception in the Linux kernel](#traffic-interception-in-the-linux-kernel)
     - [Traffic interception using nftables](#traffic-interception-using-nftables)
     - [Traffic interception using iptables](#traffic-interception-using-iptables)
-  - [Traffic interception in the FreeBSD Kernel](#traffic-interception-in-the-freebsd-kernel)
-  - [Traffic interception in the OpenBSD Kernel](#traffic-interception-in-the-openbsd-kernel)
-  - [Traffic interception in the Windows Kernel](#traffic-interception-in-the-windows-kernel)
+  - [Traffic interception in the FreeBSD kernel](#traffic-interception-in-the-freebsd-kernel)
+  - [Traffic interception in the OpenBSD kernel](#traffic-interception-in-the-openbsd-kernel)
+  - [Traffic interception in the Windows kernel](#traffic-interception-in-the-windows-kernel)
 - [nfqws2](#nfqws2)
   - [General principles for setting parameters](#general-principles-for-setting-parameters)
   - [Full list of options](#full-list-of-options)
@@ -188,7 +188,7 @@
     - [synack](#synack)
     - [synack\_split](#synack_split)
 
-- [zapret-auto.lua automation and orchestration Library](#zapret-autolua-automation-and-orchestration-library)
+- [zapret-auto.lua automation and orchestration library](#zapret-autolua-automation-and-orchestration-library)
   - [State storage](#state-storage)
     - [automate\_conn\_record](#automate_conn_record)
     - [standard\_hostkey](#standard_hostkey)
@@ -292,35 +292,35 @@ Networks operate with IP packets, making them the fundamental unit of processing
 `nfqws2` does not run in kernel mode; it is a user-mode process. Therefore, the first stage of processing involves passing packets from the OS kernel to the `nfqws2` process. All four interception methods provide some degree of packet filtering. Linux offers the most extensive capabilities.
 The more unnecessary traffic is filtered out at this stage, the lower the CPU load, as passing packets between the kernel and user space involves significant overhead.
 
-When a packet arrives at `nfqws2`, the first step is to parse it according to the OSI model layers—extracting IP, IPv6, TCP, and UDP headers, as well as the data field. This process is called dissection.
-The result of this process is a [dissect](#dissect-structure)—a representation of the packet as structures where individual fields can be addressed.
+When a packet arrives at `nfqws2`, the first step is to parse it according to the OSI model layers - extracting IP, IPv6, TCP, and UDP headers, as well as the data field. This process is called dissection.
+The result of this process is a [dissect](#dissect-structure) - a representation of the packet as structures where individual fields can be addressed.
 
 Next, the `conntrack` subsystem built into `nfqws2` comes into play. This is a flow-tracking system built on top of individual packets.
 It searches for an existing flow record based on the packet's L3/L4 data. If no record exists, one is created. Old records with no recent activity are deleted.
 `conntrack` tracks the logical direction of packets within a flow (inbound/outbound), counts the number of packets and bytes passed in both directions, and monitors TCP sequence numbers. It is also used, when necessary, to reassemble messages transmitted across multiple packets.
 
-The payload type—the content of an individual packet or a group of packets—is identified via signatures. Based on the payload type, the protocol type for the entire flow is determined and maintained until the flow terminates. Different types of payloads can pass through a single flow.
+The payload type - the content of an individual packet or a group of packets - is identified via signatures. Based on the payload type, the protocol type for the entire flow is determined and maintained until the flow terminates. Different types of payloads can pass through a single flow.
 For example, the XMPP protocol usually carries several types of XMPP-specific messages as well as TLS-related messages.
-The flow protocol remains "xmpp," but subsequent packets are assigned various payload types—both known and unknown. Unknown payloads are identified as "unknown."
+The flow protocol remains "xmpp," but subsequent packets are assigned various payload types - both known and unknown. Unknown payloads are identified as "unknown."
 
 If a specific payload and flow protocol type require the reconstruction of a message from multiple packets, `nfqws2` begins buffering them in association with the `conntrack` record and prevents their immediate transmission. Once all packets of the message are received, the composite payload is reconstructed and, if necessary, decrypted.
-Further decisions are then made based on the fully assembled payload—[reasm](#handling-multi-packet-payloads)—or the result of assembly and decryption—[decrypt](#handling-multi-packet-payloads).
+Further decisions are then made based on the fully assembled payload - [reasm](#handling-multi-packet-payloads) or the result of assembly and decryption - [decrypt](#handling-multi-packet-payloads).
 
 Once the necessary information about the payload is obtained, the [profile](#using-multiple-profiles) classification system takes over.
 Profiles contain a set of filters and action commands.
-Profiles are filtered by L3 (IP protocol version, ipsets—IP address lists), L4 (TCP or UDP ports), and L6/L7 (flow protocol type, hostlists).
+Profiles are filtered by L3 (IP protocol version, ipsets - IP address lists), L4 (TCP or UDP ports), and L6/L7 (flow protocol type, hostlists).
 Profiles are scanned strictly in order from first to last. Upon the first filter match, that profile is selected, and the scanning stops.
 If none of the conditions are met, a default profile with no actions is selected.
 
 All subsequent actions are performed within the scope of the selected profile. The chosen profile is cached in the conntrack entry, so a fresh lookup is not required for every packet.
 
-A re-lookup occurs if the source data changes—specifically, upon the detection of an L7 protocol or a hostname. In these instances, a new search is performed, and the profile is switched if necessary. A stream may undergo up to two such switches throughout its lifetime, as there are only two mutable parameters.
+A re-lookup occurs if the source data changes - specifically, upon the detection of an L7 protocol or a hostname. In these instances, a new search is performed, and the profile is switched if necessary. A stream may undergo up to two such switches throughout its lifetime, as there are only two mutable parameters.
 
 Once a profile is selected, what constitutes its action-oriented logic? Actions are handled by Lua functions, and a profile can contain any number of them. Each call to a Lua function within a profile is referred to as an *instance*. A single function may be called multiple times with different parameters. Thus, the term "instance" describes a specific execution of a function, uniquely identified by the profile number and its sequential position within that profile. Instances are invoked using the `--lua-desync` parameters. Each instance receives an arbitrary set of arguments defined within `--lua-desync`. The execution order is critical to the strategy's logic and follows the exact sequence in which the `--lua-desync` parameters are specified.
 
 [in-profile filters](#in-profile-filters) are also available. There are three types: the `--payload` filter (a list of payloads accepted by the instance) and two range filters, `--in-range` and `--out-range`, which define the specific byte range within the stream that the instance should process. Once defined, in-profile filters apply to all subsequent instances until they are redefined. The primary purpose of these filters is to minimize relatively slow Lua calls by offloading as much decision-making as possible to the C-side code.
 
-When a packet reaches a Lua instance, the function receives two [parameters](#lua-function-prototype): `ctx` and `desync`. `ctx` provides a context for interacting with specific C-side functions. The [`desync`](#structure-of-the-desync-table) parameter is a table containing various attributes of the packet being processed. Most notably, it includes the [dissect](#структура-диссекта) (the `dis` subtable) and information from the conntrack entry (the [track subtable](#the-track-table-structure)). Numerous other parameters can be inspected by executing [`var_debug(desync)`](#var_debug) or by using the pre-built [`pktdebug`](#pktdebug) instance.
+When a packet reaches a Lua instance, the function receives two [parameters](#lua-function-prototype): `ctx` and `desync`. `ctx` provides a context for interacting with specific C-side functions. The [`desync`](#structure-of-the-desync-table) parameter is a table containing various attributes of the packet being processed. Most notably, it includes the [dissect](#dissect-structure) (the `dis` subtable) and information from the conntrack entry (the [track subtable](#the-track-table-structure)). Numerous other parameters can be inspected by executing [`var_debug(desync)`](#var_debug) or by using the pre-built [`pktdebug`](#pktdebug) instance.
 
 During the [replay](#handling-multi-packet-payloads) of delayed packets, the Lua instance receives details such as the part number, the total number of parts in the original message, the current part's position, and [reasm](#handling-multi-packet-payloads) or [decrypt](#handling-multi-packet-payloads) data if available.
 
@@ -328,9 +328,9 @@ Lua code can utilize the global variable space to store data that isn't specific
 
 A Lua instance can clone the current dissect, modify it, generate its own dissects, and [send](#receiving-and-sending-packets) them via C-side calls. The output of each instance is a verdict: `VERDICT_PASS` (do nothing with the current dissect), `VERDICT_MODIFY` (send the modified dissect content at the end of the processing chain), or `VERDICT_DROP` (drop the current dissect). Verdicts from all instances are aggregated: `MODIFY` overrides `PASS`, and `DROP` overrides both `PASS` and `MODIFY`.
 
-A Lua instance can opt out of receiving further packets for a flow in the in/out direction—this is known as [instance cutoff](#instance_cutoff).
-It can also disconnect the in/out direction of the current flow from all Lua processing—[lua cutoff](#lua_cutoff).
-An instance can request the [cancellation](#execution-plan-cancel) of the entire subsequent chain of Lua instance calls for the current dissect. The instance making this decision takes on the role of coordinating further actions.
+A Lua instance can opt out of receiving further packets for a flow in the in/out direction - this is known as [instance cutoff](#instance_cutoff).
+It can also disconnect the in/out direction of the current flow from all Lua processing - [lua cutoff](#lua_cutoff).
+An instance can request the [cancellation](#execution_plan_cancel) of the entire subsequent chain of Lua instance calls for the current dissect. The instance making this decision takes on the role of coordinating further actions.
 Such an instance is called an **orchestrator**. It receives an [execution plan](#execution_plan) from the C code, which includes all profile filters and call parameters for all remaining instances. It then decides when and under what conditions to invoke them (or not) and whether to modify their parameters. This enables dynamic scenarios without modifying the core strategy code.
 Examples include [detecting](#success-and-failure-detection) resource blocking and [switching strategies](#circular) if the previous one failed.
 
@@ -342,7 +342,7 @@ Finally, nfqws2 returns to waiting for the next packet, and the cycle repeats.
 
 # Traffic interception from the OS Kernel
 
-## Traffic interception in the Linux Kernel
+## Traffic interception in the Linux kernel
 
 This is achieved using `iptables` or `nftables` via the NFQUEUE mechanism.
 `nftables` is preferred because it allows working with traffic after NAT, whereas `iptables` does not. This is critical when processing forwarded traffic. With `iptables`, post-NAT interception is impossible; therefore, certain techniques that break NAT cannot be implemented on forwarded traffic using `iptables`.
@@ -462,7 +462,7 @@ iptables -F -t mangle
 ip6tables -F -t mangle
 ```
 
-## Traffic interception in the FreeBSD Kernel
+## Traffic interception in the FreeBSD kernel
 
 The primary challenge when intercepting traffic on non-Linux systems is the inability to intercept only the initial packets of a stream. You can only intercept the entire stream in a specific direction.
 FreeBSD is particularly limited in this regard, as it lacks raw payload filtering capabilities (filtering based on packet content).
@@ -506,7 +506,7 @@ ipfw add $RULE divert $PORT_DIVERT udp from any $PORTS_UDP to any in not diverte
 While traffic interception via `pf divert-to` is theoretically possible, the loop prevention mechanism is broken in practice, making `pf` unusable for this purpose.
 On pfSense and OPNsense, additional steps are required to enable both `pf` and `ipfw` simultaneously. This frequently leads to issues, conflicts, and glitches.
 
-## Traffic interception in the OpenBSD Kernel
+## Traffic interception in the OpenBSD kernel
 
 OpenBSD relies solely on `pf`. Its `divert` loop prevention mechanism works correctly.
 
@@ -549,7 +549,7 @@ pass out quick on $IFACE_WAN proto udp to port { $PORTS_UDP } divert-packet port
 > [!CAUTION]
 > FreeBSD uses a different version of `pf` with slightly different syntax. Furthermore, `pf` in FreeBSD is effectively broken for this use case because loop prevention does not work. While macOS also uses `pf`, `ipdivert` has been removed from its kernel, so these rules will not function.
 
-## Traffic interception in the Windows Kernel
+## Traffic interception in the Windows kernel
 
 Windows lacks native tools for traffic interception. Instead, a third-party solution is used: the `windivert` driver.
 Control is integrated directly into the `winws2` process.
@@ -561,11 +561,11 @@ The WinDivert driver is no longer under active development. However, signed vers
 
 When using `winws2` on Windows 11 ARM64, you must use the x86_64 version because `winws2` is built for Cygwin, which does not support ARM. In this configuration, the `.sys` driver must be replaced with the unsigned ARM64 version. Running on Windows 10 ARM64 is theoretically possible, but only with the 32-bit `winws2` x86 version, as Windows 10 does not support x64 emulation.
 
-WinDivert is a frequent target for antivirus software. While it is a "hacker tool," it is not a virus. It is best understood as a Windows equivalent to `iptables`. Conflicts with third-party kernel-mode software—primarily antiviruses and firewalls—can occur, occasionally resulting in Blue Screens of Death (BSOD). Fixing these issues is practically impossible, largely due to driver signing requirements; obtaining a signature is prohibitively difficult and expensive for individuals without corporate backing.
+WinDivert is a frequent target for antivirus software. While it is a "hacker tool," it is not a virus. It is best understood as a Windows equivalent to `iptables`. Conflicts with third-party kernel-mode software - primarily antiviruses and firewalls - can occur, occasionally resulting in Blue Screens of Death (BSOD). Fixing these issues is practically impossible, largely due to driver signing requirements; obtaining a signature is prohibitively difficult and expensive for individuals without corporate backing.
 
 WinDivert cannot reliably intercept forwarded traffic when using Windows' built-in network sharing or NAT. Consequently, features for handling forwarded traffic are not implemented. The only available workaround is to set up a proxy server.
 
-`winws2` can accept full raw filters—you can write the filter yourself and specify it using the `--wf-raw=<filter>` or `--wf-raw=@<filter_file>` parameters. Since this is often cumbersome, a built-in filter constructor is provided.
+`winws2` can accept full raw filters-you can write the filter yourself and specify it using the `--wf-raw=<filter>` or `--wf-raw=@<filter_file>` parameters. Since this is often cumbersome, a built-in filter constructor is provided.
 
 `--wf-tcp-out`, `--wf-tcp-in`, `--wf-udp-out`, and `--wf-udp-in` take a list of ports (`80,443`) or port ranges (`80,443,500-1000`) and enable full port interception for the specified direction.
 
@@ -581,7 +581,7 @@ The filter constructor automatically intercepts incoming TCP packets with SYN+AC
 
 If any TCP port interception is active, HTTP redirect interception is automatically enabled to allow `autohostlist` to function. HTTP redirect interception works via payload signatures, meaning it inspects bytes at specific positions within the packet content.
 
-For UDP protocols—especially those where the port is not fixed—it is preferable to use custom `--wf-raw-part` filters to save on CPU cycles. Filters can also be used for TCP, but you must account for the requirements of `conntrack`. It requires at least the SYN packet, and ideally FIN and RST as well. If you need to filter based on messages that span more than one TCP segment, this cannot be achieved using WinDivert filters alone; full port interception for that direction is required.
+For UDP protocols-especially those where the port is not fixed-it is preferable to use custom `--wf-raw-part` filters to save on CPU cycles. Filters can also be used for TCP, but you must account for the requirements of `conntrack`. It requires at least the SYN packet, and ideally FIN and RST as well. If you need to filter based on messages that span more than one TCP segment, this cannot be achieved using WinDivert filters alone; full port interception for that direction is required.
 
 # nfqws2
 
@@ -599,7 +599,7 @@ This feature is not supported in the Android and OpenBSD versions.
 
 ## Full list of options
 
-General parameters for all versions — nfqws2, dvtws2, winws2.
+General parameters for all versions - nfqws2, dvtws2, winws2.
 
 ```
  @<config_file>                                         ; read command-line options from a file. all other command-line options are ignored.
@@ -716,7 +716,7 @@ nfqws2 <global_parameters>
 ```
 
 When a packet arrives and there is no existing conntrack entry for it, a profile is selected.
-Profile filters are checked sequentially—from start to finish, left to right—and in no other way.
+Profile filters are checked sequentially - from start to finish, left to right - and in no other way.
 Only one profile ever wins: the first one to match the filter conditions. All others are ignored.
 If no filter matches, an empty profile (ID 0) is selected, which performs no actions on the traffic.
 
@@ -733,7 +733,7 @@ If a strategy needs to start from the very first packet and continue working aft
 When dealing with many complex and repetitive strategies, it can be convenient to use templates.
 A template is essentially a profile that is not active; instead, it is placed in a separate template list.
 A profile becomes a template by using the `--template=<name>` parameter.
-It can then be imported using `--import=<name>`. Importing copies the entire profile, not just the specified settings—all other settings are reset to their default values.
+It can then be imported using `--import=<name>`. Importing copies the entire profile, not just the specified settings-all other settings are reset to their default values.
 Any existing settings in the current profile are wiped, including the name.
 Therefore, `--import` should be written at the beginning, followed by parameters unique to that profile.
 Templates can also import one another. A unique name is mandatory for a template, and since importing copies the name, you must assign a unique name using `--name` after the import.
@@ -758,7 +758,7 @@ Any parameters applicable to profiles, including filters, are allowed within tem
 
 ### Filtering by lists
 
-If hostlist filters are used—meaning there is at least one domain in any hostlist or an autohostlist is specified—the profile will never be selected if the hostname is missing.
+If hostlist filters are used - meaning there is at least one domain in any hostlist or an autohostlist is specified - the profile will never be selected if the hostname is missing.
 The case where there is no autohostlist and all list files are empty is treated as if no hostlist filter exists.
 
 If there is no autohostlist but there are entries in standard hostlists, the profile is selected only if the current host matches any of the include lists and does not match any of the exclude lists.
@@ -770,7 +770,7 @@ If an autohostlist is present, the profile is always selected as long as a hostn
 - If a host is in neither the exclusion nor the inclusion lists, no strategy is applied, and access failure detection begins. If a failure occurs, the failure counter increments. If a success occurs or the time interval between failures exceeds `--hostlist-auto-fail-time`, the counter resets.
 When the counter reaches `--hostlist-auto-fail-threshold`, the host is added to the auto-list.
 On the next request, the host will be treated as if it were in the inclusion list.
-- Hostlist and ipset files are reloaded automatically when modified—restarting `nfqws2` is not required.
+- Hostlist and ipset files are reloaded automatically when modified - restarting `nfqws2` is not required.
 - The SIGHUP signal marks all lists for a forced reload during the processing of the next packet.
 - Each entry for a domain, IP address, or subnet must be on a new line.
 - Hostlists and ipsets support comments. Empty lines and lines starting with `#` are ignored.
@@ -815,7 +815,7 @@ In Linux, the `--filter-ssid` profile filter is used. When specified, `nfqws2` a
 
 The approach in Windows is different. It monitors the presence of the specified Wi-Fi networks across all Wi-Fi adapters. If any of them match an SSID in the list, WinDivert interception is enabled; otherwise, it is disabled. To handle different Wi-Fi networks with different strategies, you must run multiple instances of `winws2`. One instance will activate while others deactivate. The SSID list is specified using the `--ssid-filter` parameter.
 
-Another way to address this—and not just for Wi-Fi—is by using the Network List Manager (NLM) filter.
+Another way to address this-and not just for Wi-Fi-is by using the Network List Manager (NLM) filter.
 `--nlm-list[=all]` returns a list of GUIDs for connected networks (or all networks if the "all" value is specified). You then enter the comma-separated list of GUIDs into `--nlm-filter`.
 
 An NLM network is the result of the system detecting a connection to a specific network. You might connect to a router via Wi-Fi or Ethernet, but it will be recognized as the same network. To distinguish between networks, the system typically looks at the gateway's MAC address. NLM technology is interesting and useful, but unfortunately, adequate management tools were only available in Windows 7. In newer systems, you have to dig into PowerShell or the Registry to manually assign connections to the correct GUIDs if the system categorizes them incorrectly. Alternatively, you can simply use the list of GUIDs automatically assigned by the system.
@@ -824,13 +824,13 @@ An NLM network is the result of the system detecting a connection to a specific 
 
 Certain types of manipulations can be performed not only from the client side but also from the server side. `nfqws2` was designed to fully support both inbound and outbound traffic, on both the client and server sides.
 
-The concept of "direction" in a network is largely relative. For the endpoints of a packet, everything is clear: something is sent, something is received. But for a router, it is not clear at all. There is only an incoming interface and an outgoing interface. Essentially, the two directions are equivalent if we only consider the L3 level—the level of individual IP packets.
+The concept of "direction" in a network is largely relative. For the endpoints of a packet, everything is clear: something is sent, something is received. But for a router, it is not clear at all. There is only an incoming interface and an outgoing interface. Essentially, the two directions are equivalent if we only consider the L3 level - the level of individual IP packets.
 
 Therefore, direction in `nfqws2` is handled by tracking flows. A flow is either a TCP connection or a sequence of UDP packets. Since UDP does not have the concept of a connection, the general term "flow" is used.
 
 A flow is characterized by a 4-tuple: ip1:port1-ip2:port2. This set of values determines which flow a packet belongs to.
 
-In `nfqws2`, flows are tracked by `conntrack`. The party that sends the first SYN (TCP) or the first UDP packet is considered the client, and the opposite end is the server. If a flow entry in `conntrack` was created by a SYN,ACK packet (TCP), that end is considered the server and the opposite end the client. In this way, `conntrack` determines the roles in establishing the connection and maintains a separate set of [counters](#the-track-table-structure) for each role—how many packets have passed, how many data packets, how many bytes transferred, etc.
+In `nfqws2`, flows are tracked by `conntrack`. The party that sends the first SYN (TCP) or the first UDP packet is considered the client, and the opposite end is the server. If a flow entry in `conntrack` was created by a SYN,ACK packet (TCP), that end is considered the server and the opposite end the client. In this way, `conntrack` determines the roles in establishing the connection and maintains a separate set of [counters](#the-track-table-structure) for each role-how many packets have passed, how many data packets, how many bytes transferred, etc.
 
 In client mode, the "outgoing" direction is considered the direction from the client; in server mode (`--server`), it is the direction from the server. The "inbound" direction is the opposite.
 
@@ -852,7 +852,7 @@ Direction can also be determined by interface names. In a standard LAN-WAN confi
 
 If the router operates without NAT (typical for IPv6), the stage at which packets are intercepted does not matter. All IP addresses are equivalent. You can connect to the internet, and the internet can connect to you; you are an integral part of it with direct IP addressing. In practice, however, inbound connections are unlikely, as you will likely protect yourself with a firewall. Therefore, direction can still be clearly defined by the interface. Nevertheless, if you do host an internal server, you can run a separate `nfqws2` instance in server mode for it, while using standard mode for client traffic.
 
-In BSD, `ipfw` or `pf` rules are typically written this way—"xmit wan", "recv wan"—supplemented by filters for destination ports on `xmit` and source ports on `recv` (or vice versa for server mode). This reliably identifies the traffic intended for interception based on its direction.
+In BSD, `ipfw` or `pf` rules are typically written this way - "xmit wan", "recv wan" - supplemented by filters for destination ports on `xmit` and source ports on `recv` (or vice versa for server mode). This reliably identifies the traffic intended for interception based on its direction.
 
 ## IP cache
 
@@ -860,13 +860,13 @@ The `ipcache` is an in-memory data structure that allows the process to store in
 
 1. **IP, interface => incoming ttl**. The TTL/HL of the first inbound packet is cached. This allows Lua functions (`autottl`) to use it immediately starting from the very first packet, even before a response has been received.
 
-2. **IP => hostname**. The hostname is cached (independent of the interface) to facilitate profile lookups via hostlists and to provide the name to Lua functions when the hostname is not yet known. This mode is disabled by default and can be enabled using the `ipcache-hostname` parameter. This technique is experimental. Its main drawback is the lack of a one-to-one correspondence between domains and IP addresses; multiple domains can point to the same IP. In the event of a collision, the hostname is overwritten by the most recent entry. Furthermore, a domain may cycle through different IPs on a CDN—one address now, another an hour later. This issue is addressed via the cache entry lifetime: `--ipcache-lifetime` (defaulting to 2 hours). Nevertheless, you may find that in your specific case, the benefits of this technique outweigh the drawbacks. Be prepared for behavior that may seem confusing at first; such issues can be investigated using the `--debug` log.
+2. **IP => hostname**. The hostname is cached (independent of the interface) to facilitate profile lookups via hostlists and to provide the name to Lua functions when the hostname is not yet known. This mode is disabled by default and can be enabled using the `ipcache-hostname` parameter. This technique is experimental. Its main drawback is the lack of a one-to-one correspondence between domains and IP addresses; multiple domains can point to the same IP. In the event of a collision, the hostname is overwritten by the most recent entry. Furthermore, a domain may cycle through different IPs on a CDN-one address now, another an hour later. This issue is addressed via the cache entry lifetime: `--ipcache-lifetime` (defaulting to 2 hours). Nevertheless, you may find that in your specific case, the benefits of this technique outweigh the drawbacks. Be prepared for behavior that may seem confusing at first; such issues can be investigated using the `--debug` log.
 
 Hostnames for caching are retrieved from L7 protocol analysis and DNS responses (excluding DoH).
 DNS extraction works only via the UDP protocol and requires redirecting packets from port 53. Only DNS responses with source port 53 are processed.
 On Windows, this is configured using `--wf-udp-in=53`. Since DNS queries will likely be directed to the local network, the `--wf-filter-lan=0` parameter is required.
 If a DNS proxy is running on Windows and DNS is configured to use localhost, `--wf-filter-loopback=0` will also be necessary.
-On a router, if encrypted DNS is used, you must capture requests from the client before they are encrypted—on the LAN interface.
+On a router, if encrypted DNS is used, you must capture requests from the client before they are encrypted on the LAN interface.
 If encryption is not used, they can be captured on the WAN interface as well.
 For the LAN interface, these will be outgoing; for the WAN interface, they will be incoming, following the conntrack "reply" direction.
 
@@ -914,14 +914,14 @@ Linux:
 - Changes UID/GID to those specified in the `--user` and `--uid` parameters. Defaults to `0x7FFFFFFF`.
 - Drops capabilities to `cap_net_raw` and `cap_net_admin` (required for NFQUEUE). The bounding set is cleared to zero.
 - Sets the `NO_NEW_PRIVS` flag to prevent SUID bits and file capabilities from functioning. If the kernel is older than 3.5 and `NO_NEW_PRIVS` is not supported, a warning is displayed, but execution continues.
-- Enables a seccomp filter that prohibits `exec` and several file operations—reading directory contents, creating/deleting directories, creating special files (links, devices), `chmod`, `chown`, sending signals (`kill`), and `ptrace`.
+- Enables a seccomp filter that prohibits `exec` and several file operations - reading directory contents, creating/deleting directories, creating special files (links, devices), `chmod`, `chown`, sending signals (`kill`), and `ptrace`.
 In the event of a violation, the process is terminated. If the kernel does not support seccomp, a warning is displayed, but execution continues.
 
 Windows:
 
 - While the `windivert` driver requires administrator privileges, the `winws2` process sets its own integrity level to Low Mandatory Level after initialization. This prevents write access to almost all files and objects protected by a security descriptor. The process can no longer manage services or perform privileged actions. However, the Administrators group remains in the process token, so nothing prevents reading most files if they are accessible to Administrators. Lua lacks built-in tools for reading directory contents, making it difficult for an attacker to discover files of interest.
 - All `Se*` privileges are irrevocably removed from the token, except for `SeChangeNotifyPrivilege`.
-- A Job object is used to prohibit the creation of child processes and restrict desktop interaction—clipboard access, changing desktop settings, changing display settings, etc.
+- A Job object is used to prohibit the creation of child processes and restrict desktop interaction - clipboard access, changing desktop settings, changing display settings, etc.
 
 There is a simple way to pass a writable directory to the Lua code using the `--writeable[=<dirname>]` parameter. `nfqws2` creates the directory and assigns permissions so that the Lua code can write files there, then passes the directory name in the `WRITEABLE` environment variable. If `dirname` is not specified, a directory is created within `%USERPROFILE%/AppData/LocalLow` on Windows.
 
@@ -953,7 +953,7 @@ A blob is a binary data block of any size that can be loaded into a Lua variable
 
 Direct file operations from Lua code are not recommended unless absolutely necessary. Lua code runs with restricted privileges; intended operations might fail or behave inconsistently across different operating systems and environments. Blob loading occurs before entering the sandbox, providing a higher chance of success.
 
-### In-profile Filters
+### In-profile filters
 
 These come in three types: `--payload`, `--in-range`, and `--out-range`. Filter values remain active from the moment they are specified until the next override.
 
@@ -964,19 +964,19 @@ Ranges are specified in the following formats: `mX-mY`, `mX<mY`, `-mY`, `<mY`, `
 
 The following counter modes are available:
 
-- 'a' — always
-- 'x' — never
-- 'n' — packet number
-- 'd' — data packet number
-- 'b' — byte position of transmitted data
-- 's' — tcp: relative sequence of the start of the current packet (works within a 2 GB range)
-- 'p' — tcp: relative sequence of the upper bound of the current packet (s + payload length; works within a 2 GB range)
+- 'a' - always
+- 'x' - never
+- 'n' - packet number
+- 'd' - data packet number
+- 'b' - byte position of transmitted data
+- 's' - tcp: relative sequence of the start of the current packet (works within a 2 GB range)
+- 'p' - tcp: relative sequence of the upper bound of the current packet (s + payload length; works within a 2 GB range)
 
 > [!CAUTION]
-> In winws2, the `--wf-tcp-empty=0` parameter is enabled by default. This blocks the interception of empty ACK packets, which can reduce CPU usage by approximately 50% during intensive downloads. Empty ACKs are unnecessary for most strategies. However, this also breaks the "n" counter—it will not reflect the actual number of packets in the connection. If you require an accurate count, specify the `--wf-tcp-empty=1` parameter. On other systems, counter accuracy depends directly on the capture filters. A counter cannot and will not track what is not intercepted.
+> In winws2, the `--wf-tcp-empty=0` parameter is enabled by default. This blocks the interception of empty ACK packets, which can reduce CPU usage by approximately 50% during intensive downloads. Empty ACKs are unnecessary for most strategies. However, this also breaks the "n" counter-it will not reflect the actual number of packets in the connection. If you require an accurate count, specify the `--wf-tcp-empty=1` parameter. On other systems, counter accuracy depends directly on the capture filters. A counter cannot and will not track what is not intercepted.
 
 nfqws2 monitors the upper bounds of counters for all Lua instances.
-If the upper bound for a direction is exceeded in all instances, or if the instances voluntarily enter a "cutoff" state for that direction, a "lua cutoff" occurs—disabling Lua processing for the current thread. This is designed to conserve CPU resources, as checking a single boolean flag requires virtually no processing power.
+If the upper bound for a direction is exceeded in all instances, or if the instances voluntarily enter a "cutoff" state for that direction, a "lua cutoff" occurs disabling Lua processing for the current thread. This is designed to conserve CPU resources, as checking a single boolean flag requires virtually no processing power.
 
 ### Typical instance invocation scheme within a profile
 
@@ -1360,7 +1360,7 @@ All multi-byte numeric values are automatically converted from network byte orde
 | :------- | :--------------------------------------------------- |
 | uh_sport | source port                                          |
 | uh_dport | destination port                                     |
-| uh_ulen  | UDP length — UDP_BASE_LEN (8) header + payload length |
+| uh_ulen  | UDP length - UDP_BASE_LEN (8) header + payload length |
 | uh_sum   | UDP checksum                                         |
 
 **tcp**
@@ -1408,7 +1408,7 @@ The `track` table is present in `desync` only if a conntrack entry was found for
 It may not be found if the `nfqws2` process did not receive the SYN or SYN-ACK packet.
 For instance, the connection might have been established before `nfqws2` was started, you might not have intercepted SYN and SYN-ACK from the kernel, or you might have explicitly disabled conntrack via `--ctrack-disable`.
 Your code must always check for the existence of `track` before accessing it; otherwise, the script will crash.
-The same applies to optional `track` fields. Test your code with `--ctrack-disable` and across different protocols—TCP and UDP.
+The same applies to optional `track` fields. Test your code with `--ctrack-disable` and across different protocols-TCP and UDP.
 
 **track**
 
@@ -1454,16 +1454,16 @@ The list of counter table fields is provided below. The `tcp` sub-table is prese
 
 mss, winsize, and scale are transmitted from one side of the connection to the other so that each side knows the acceptable parameters of its peer.
 When using these fields, it is critical not to confuse the sides.
-If you need to know what packet size can be sent, you must look at the opposite side—what it is capable of receiving.
+If you need to know what packet size can be sent, you must look at the opposite side - what it is capable of receiving.
 The mss is duplicated in the `desync.tcp_mss` field regardless of whether conntrack is present. The value there is already calculated for use in determining the size of the packet to be sent.
-If conntrack is unavailable or if mss was not negotiated by the parties, a default value is set—DEFAULT_MSS (1220).
+If conntrack is unavailable or if mss was not negotiated by the parties, a default value is set - DEFAULT_MSS (1220).
 
 When working with sequences, you must account for their 32-bit unsigned nature.
 If you add 100 to 4,294,967,280 (0xFFFFFFF0), the result will not be 4,294,967,380 (0x100000054), but 84 (0x54).
 If you add these numbers in Lua, you will get 4,294,967,380 because Lua represents numbers with more than 32 bits of precision and uses signed values.
 For sequence operations and comparisons, it is recommended to use the C functions `u32add` and `bitand`.
 For example, the expression `0==bitand(u32add(seq1, -seq2), 0x80000000)` is equivalent to `seq1 >= seq2`.
-However, the latter simple comparison will not work correctly, whereas the former will—provided that `seq1` has not drifted from `seq2` by more than 2 GB.
+However, the latter simple comparison will not work correctly, whereas the former will-provided that `seq1` has not drifted from `seq2` by more than 2 GB.
 It is impossible to track anything beyond that using sequences. Always keep in mind that when transferring large volumes of data, sequences cannot serve as a counter.
 The `p*counter` fields are 64-bit counters, so they do not suffer from this issue.
 
@@ -1694,7 +1694,7 @@ If the `hex_string` is invalid, it returns `nil`.
 
 Lua typically has a standard binding module for OpenSSL that provides a wide range of cryptographic functions.
 However, relying on external modules is often not an option, as Lua is frequently linked statically without support for loading external modules.
-To avoid unnecessary dependencies and extra files—especially since OpenSSL's multi-megabyte size is a concern for embedded systems—this implementation is self-contained.
+To avoid unnecessary dependencies and extra files-especially since OpenSSL's multi-megabyte size is a concern for embedded systems - this implementation is self-contained.
 
 `nfqws2` does not use any external crypto libraries, but it includes a minimal set of cryptographic operations required for certain protocols (such as QUIC).
 These functions are exposed to Lua and can be used for any purpose.
@@ -1814,7 +1814,7 @@ function gzip_deflate(zstream, uncompressed_data, expected_compressed_chunk_size
 function uname()
 ```
 
-Returns the same value as the `uname` shell command—the OS kernel name (e.g., "Linux", "FreeBSD", "OpenBSD").
+Returns the same value as the `uname` shell command-the OS kernel name (e.g., "Linux", "FreeBSD", "OpenBSD").
 On Windows, it returns a string starting with "CYGWIN" followed by the version.
 
 #### clock_gettime
@@ -1842,7 +1842,7 @@ These are tables with specific fields. If `nil` is passed, it is assumed that no
 
 #### standard reconstruct
 
-Dissect reconstruction options—`reconstruct_opts`. Reconstruction is the process of assembling a raw packet from a dissect.
+Dissect reconstruction options-`reconstruct_opts`. Reconstruction is the process of assembling a raw packet from a dissect.
 
 | Field             | Type   | Description                                                                                       |
 | :---------------- | :----- | :------------------------------------------------------------------------------------------------ |
@@ -1865,7 +1865,7 @@ No matter what value you input, there is a small probability (1/65536) that it w
 
 #### standard rawsend
 
-Raw packet sending options — `rawsend_opts`
+Raw packet sending options - `rawsend_opts`
 
 | Field   | Type   | Description                                                                                               |
 | :------ | :----- | :-------------------------------------------------------------------------------------------------------- |
@@ -1888,7 +1888,7 @@ Other systems will not do this. If you need to manage the `ip_id` manually acros
 ### Dissection and reconstruction
 
 Dissection is the process of obtaining a structured representation of a raw IP packet.
-Reconstruction is the reverse process—generating a raw IP packet from a dissect.
+Reconstruction is the reverse process-generating a raw IP packet from a dissect.
 
 #### dissect
 
@@ -1949,7 +1949,7 @@ Functions for fixing checksums. Since strings in Lua are immutable, these functi
 - `csum_tcp_fix` and `csum_udp_fix` take a raw IP header (IPv4 or IPv6), a TCP/UDP header, and the payload. The IP version is detected automatically. The checksum is calculated based on the L3 and L4 headers and the payload.
 
 Direct reconstruction of individual headers is rarely necessary. Typically, all tasks are handled by functions working with dissects.
-However, in special cases—for example, if you need to construct an ICMP packet—you will have to assemble it piece by piece and use `rawsend` for transmission.
+However, in special cases-for example, if you need to construct an ICMP packet-you will have to assemble it piece by piece and use `rawsend` for transmission.
 You will almost certainly need `csum_ip4_fix` in such scenarios.
 
 ### Receiving and sending Packets
@@ -1978,20 +1978,20 @@ It can be retrieved on demand using the `raw_packet` function.
 
 #### Markers
 
-- **Absolute positive marker** — a numeric offset within the payload.
-- **Absolute negative marker** — a numeric offset within the payload relative to the byte following the end. -1 points to the last byte.
-- **Relative marker** — a positive or negative offset relative to a logical position within the payload.
+- **Absolute positive marker** - a numeric offset within the payload.
+- **Absolute negative marker** - a numeric offset within the payload relative to the byte following the end. -1 points to the last byte.
+- **Relative marker** - a positive or negative offset relative to a logical position within the payload.
 
 Relative positions:
 
-- **method** — the start of the HTTP method ('GET', 'POST', 'HEAD', ...). The method is usually at position 0, but may shift due to `methodeol`, in which case the position may become 1 or 2.
-- **host** — the start of the hostname.
-- **endhost** — the byte following the last byte of the hostname.
-- **sld** — the start of the second-level domain (SLD) in the hostname.
-- **endsld** — the byte following the last byte of the second-level domain.
-- **midsld** — the middle of the second-level domain.
-- **sniext** — the start of the SNI extension data field in TLS. Any extension consists of 2-byte type and length fields, followed by the data field.
-- **extlen** — the length field of TLS extensions.
+- **method** - the start of the HTTP method ('GET', 'POST', 'HEAD', ...). The method is usually at position 0, but may shift due to `methodeol`, in which case the position may become 1 or 2.
+- **host** - the start of the hostname.
+- **endhost** - the byte following the last byte of the hostname.
+- **sld** - the start of the second-level domain (SLD) in the hostname.
+- **endsld** - the byte following the last byte of the second-level domain.
+- **midsld** - the middle of the second-level domain.
+- **sniext** - the start of the SNI extension data field in TLS. Any extension consists of 2-byte type and length fields, followed by the data field.
+- **extlen** - the length field of TLS extensions.
 
 Relative markers work with logical elements of specific known payloads and will not function with arbitrary data.
 
@@ -2024,9 +2024,9 @@ function instance_cutoff(ctx, outgoing)
 Voluntary self-cutoff of an instance for the specified direction.
 The instance will no longer be called within the current flow.
 
-- `outgoing = true` — outbound direction
-- `outgoing = false` — inbound direction
-- `outgoing = nil` — both directions
+- `outgoing = true` - outbound direction
+- `outgoing = false` - inbound direction
+- `outgoing = nil` - both directions
 
 #### lua_cutoff
 
@@ -2069,7 +2069,7 @@ Returns an array of information about all subsequent, pending instances in the c
 
 | Field | Type   | Description                         |
 | :---  | :----- | :---------------------------------- |
-| mode  | string | counter mode — a, x, n, d, b, s, p  |
+| mode  | string | counter mode - a, x, n, d, b, s, p  |
 | pos   | number | counter value                       |
 
 #### execution_plan_cancel
@@ -2097,7 +2097,7 @@ function luaexec(ctx, desync)
 ```
 
 Executes arbitrary Lua code specified in the "code" argument.
-The code can address the `desync` table—it is temporarily assigned to a global variable named `desync`, which is cleared once the code finishes executing.
+The code can address the `desync` table-it is temporarily assigned to a global variable named `desync`, which is cleared once the code finishes executing.
 
 Example: `--lua-desync=luaexec:code="desync.rnd=brandom(math.random(5,10))"`
 
@@ -2212,7 +2212,7 @@ Checks whether string `v` is included in a comma-separated list of strings `s`. 
 function find_next_line(s, pos)
 ```
 
-Works with multiline text `s`. Lines are separated by EOL characters — `\n` or `\r\n`.
+Works with multiline text `s`. Lines are separated by EOL characters - `\n` or `\r\n`.
 Returns two values: the starting position of the current line and the starting position of the next line (or the end of the text `s` if no more lines remain).
 
 ## Raw string handling
@@ -2448,7 +2448,7 @@ Parsing and reconstruction of TLS. Capabilities of these functions:
 
 The functions do not work with DTLS.
 
-`tls_dissect` returns a table—a parsed raw TLS string starting from the specified `offset` (1-indexed). `reconstruct_dissect` returns the raw string of the assembled `tdis` parsing. In case of an error, `nil` is returned.
+`tls_dissect` returns a table - a parsed raw TLS string starting from the specified `offset` (1-indexed). `reconstruct_dissect` returns the raw string of the assembled `tdis` parsing. In case of an error, `nil` is returned.
 
 The simplest way to obtain a dissection sample is: `--payload=tls_client_hello --lua-desync=luaexec:code="var_debug(tls_dissect(desync.reasm_data))"`.
 Then, initiate a TLS request.
@@ -3005,7 +3005,7 @@ IPv6 extension headers are added in the following order:
 6. ah
 
 `tcp_ts_up` is a very strange phenomenon discovered during the testing of *nfqws2*.
-It turns out that if a TCP timestamp option is present, Linux consistently drops packets with a valid SEQ but an invalid ACK—but only if the timestamp option comes first.
+It turns out that if a TCP timestamp option is present, Linux consistently drops packets with a valid SEQ but an invalid ACK-but only if the timestamp option comes first.
 *nfqws1* did not respect the order of TCP options, resulting in the timestamp always being placed first.
 Consequently, the old version worked stably, while the new one did not.
 `tcp_ts_up` replicates the old behavior by moving the timestamp to the very top.
@@ -3063,7 +3063,7 @@ The unfragmentable part is transmitted in every fragment with modified fragment 
 According to the standard, for IPv6 fragmentation, the "next protocol" is only read from the first fragment (where offset=0).
 In subsequent fragments, it does not have to match and is ignored. Manipulating the "next protocol" field of subsequent fragments is a well-known penetration attack technique described in various security articles, allowing one to bypass certain firewalls.
 `ipfrag2` implements this capability for two fragments via the `ipfrag_next` parameter.
-Some firewalls can only be bypassed using a larger number of fragments—this would require a custom fragmenter function.
+Some firewalls can only be bypassed using a larger number of fragments-this would require a custom fragmenter function.
 
 ### wssize_rewrite
 
@@ -3073,8 +3073,8 @@ function wsize_rewrite(dis, arg)
 
 Rewrite `dis.tcp.th_win` and the scale factor in TCP options within the dissect, if present. Increasing the scaling factor is blocked.
 
-- arg: wsize — window size
-- arg: scale — scale factor
+- arg: wsize - window size
+- arg: scale - scale factor
 - returns true if any changes were made
 
 ### dis_reverse
@@ -3151,7 +3151,7 @@ These functions operate on a string representing a comma-separated list of paylo
 
 Typically, operations are performed on the entire [reasm](#handling-multi-packet-payloads) rather than its individual parts. This is the purpose of reassembly: to avoid dealing with separate packets and instead process the entire message at once.
 
-The standard scenario involves processing after receiving the first part of a [replay](#handling-multi-packet-payloads) and either ignoring or dropping the remaining parts. The choice between ignoring or dropping may depend on the success of actions involving [reasm](#handling-multi-packet-payloads). For example, whether or not a segmented [reasm](#handling-multi-packet-payloads) was successfully sent. If successful, all other parts must be dropped; otherwise, they will be sent as duplicates in the original segmentation. If an error occurs and the segmented packets could not be sent, dropping the rest would prevent the full message from reaching the recipient, leading to retransmissions. In such cases, it is better to leave them as is—this way, nothing breaks.
+The standard scenario involves processing after receiving the first part of a [replay](#handling-multi-packet-payloads) and either ignoring or dropping the remaining parts. The choice between ignoring or dropping may depend on the success of actions involving [reasm](#handling-multi-packet-payloads). For example, whether or not a segmented [reasm](#handling-multi-packet-payloads) was successfully sent. If successful, all other parts must be dropped; otherwise, they will be sent as duplicates in the original segmentation. If an error occurs and the segmented packets could not be sent, dropping the rest would prevent the full message from reaching the recipient, leading to retransmissions. In such cases, it is better to leave them as is - this way nothing breaks.
 
 ```
 function replay_first(desync)
@@ -3345,7 +3345,7 @@ function http_hostcase(ctx, desync)
 ```
 
 - arg: [standard direction](#standard-direction)
-- arg: spell — the exact spelling of the header. Defaults to "host".
+- arg: spell - the exact spelling of the header. Defaults to "host".
 
 Changes the case of the `Host:` HTTP header.
 
@@ -3387,8 +3387,8 @@ Replaces the `0D0A` line endings with `0A`. The difference in length is compensa
 function wsize(ctx, desync)
 ```
 
-- arg: wsize — TCP window size.
-- arg: scale — scaling factor. Replaced in the TCP option if present. Only reduction is allowed; increasing the factor is blocked.
+- arg: wsize - TCP window size.
+- arg: scale - scaling factor. Replaced in the TCP option if present. Only reduction is allowed; increasing the factor is blocked.
 
 Changes `tcp.th_win` and/or the scaling factor in the TCP SYN,ACK packet, then executes an [instance cutoff](#instance_cutoff). If the modification is successful, it sets `VERDICT_MODIFY`.
 
@@ -3401,9 +3401,9 @@ function wssize(ctx, desync)
 ```
 
 - arg: [standard direction](#standard-direction)
-- arg: wsize — TCP window size.
-- arg: scale — scaling factor. Replaced in the TCP option if present. Only reduction is allowed; increasing the factor is blocked.
-- arg: forced_cutoff — a comma-separated list of payload types that trigger an [instance cutoff](#instance_cutoff) upon receipt. If `wssize` needs to be applied indefinitely, you can set `forced_cutoff=no` (using a non-existent payload type that will never occur).
+- arg: wsize - TCP window size.
+- arg: scale - scaling factor. Replaced in the TCP option if present. Only reduction is allowed; increasing the factor is blocked.
+- arg: forced_cutoff - a comma-separated list of payload types that trigger an [instance cutoff](#instance_cutoff) upon receipt. If `wssize` needs to be applied indefinitely, you can set `forced_cutoff=no` (using a non-existent payload type that will never occur).
 
 Modifies `tcp.th_win` and/or the scaling factor in TCP options for all TCP packets in the flow's direction until the "cutoff" condition is met.
 If a modification is performed, it returns `VERDICT_MODIFY`.
@@ -3411,7 +3411,7 @@ The "cutoff" occurs upon receiving any packet with data (if the `forced_cutoff` 
 In this case, [instance cutoff](#instance_cutoff) is executed.
 
 The goal of this technique is to force the server to fragment its responses while the DPI is inspecting them (TLS 1.2).
-The idea is to keep the server "on its toes" by making it believe the client cannot receive large TCP segments, forcing it to slice its own responses—but only until the critical inspection phase has passed.
+The idea is to keep the server "on its toes" by making it believe the client cannot receive large TCP segments, forcing it to slice its own responses-but only until the critical inspection phase has passed.
 After that, the restriction must be lifted; otherwise, it will lead to a catastrophic drop in speed, potentially down to dial-up levels.
 It reduces speed in any case. This is a phase-zero technique; when used with hostlists, it can only be applied if `--ipcache-hostname` is enabled.
 When using hostlists, it may be necessary to duplicate this in a separate profile that is activated before the hostname is identified.
@@ -3487,12 +3487,12 @@ function fake(ctx, desync)
 - arg: [standard ipfrag](#standard-ipfrag)
 - arg: [standard reconstruct](#standard-reconstruct)
 - arg: [standard rawsend](#standard-rawsend)
-- arg: blob - a blob containing the fake payload. It can be of any length—segmentation is performed automatically.
+- arg: blob - a blob containing the fake payload. It can be of any length-segmentation is performed automatically.
 - arg: optional - abort the operation if the blob is missing.
 - arg: tls_mod - apply the specified tls_mod to the blob payload.
 - default payload filter - "known"
 
-This is a direct fake—a separate packet or group of packets. The function does not issue a verdict and does not block the transmission of the original packet.
+This is a direct fake-a separate packet or group of packets. The function does not issue a verdict and does not block the transmission of the original packet.
 
 ### rst
 
@@ -3542,7 +3542,7 @@ If [replaying](#multi-packet-payload-reception-features) delayed packets and [re
 
 It can be used to send arbitrary data, including fakes, by replacing the current payload with an arbitrary blob.
 
-There is no need to worry about part sizes or MTU fitting—additional automatic segmentation by MSS is applied.
+There is no need to worry about part sizes or MTU fitting-additional automatic segmentation by MSS is applied.
 
 seqovl can only be a number; markers are not supported. It is applied to the first segment being split. The seqovl_pattern is prepended to the first segment's payload according to the seqovl size, and tcp.th_seq is decreased by seqovl. This creates a data block on the left that extends beyond the TCP window, causing the server to ignore it, while the part within the TCP window is accepted.
 
@@ -3563,15 +3563,15 @@ function multidisorder(ctx, desync)
 - arg: [standard ipfrag](#standard-ipfrag)
 - arg: [standard reconstruct](#standard-reconstruct)
 - arg: [standard rawsend](#standard-rawsend)
-- arg: pos - a comma-separated list of [markers](#markers) — split points. Default is "2".
-- arg: seqovl - marker — an offset relative to the current sequence to create an additional part of the segment extending to the left.
+- arg: pos - a comma-separated list of [markers](#markers) - split points. Default is "2".
+- arg: seqovl - marker - an offset relative to the current sequence to create an additional part of the segment extending to the left.
 - arg: seqovl_pattern - the [blob](#blob-transmission) used to fill the seqovl. Default is 0x00.
 - arg: blob - replace the current payload with the specified [blob](#blob-transmission).
 - arg: optional - skip the operation if a blob is specified but missing. If seqovl_pattern is specified but missing, use the 0x00 pattern.
 - arg: nodrop - disable issuing a VERDICT_DROP.
 - default payload filter - "known"
 
-Similar to [multisplit](#multisplit), but segments are sent in reverse order—from the last to the first.
+Similar to [multisplit](#multisplit), but segments are sent in reverse order-from the last to the first.
 
 The seqovl technique works differently in this case. It is applied to the second segment in the original sequence (the penultimate one sent). seqovl can be a marker. For example, you can set a split at "midsld" and set seqovl to "midsld-1". seqovl must be smaller than the first segment in the original sequence (the last one sent); otherwise, the condition is recognized as invalid and seqovl is cancelled.
 
@@ -3594,8 +3594,8 @@ function multidisorder_legacy(ctx, desync)
 - arg: [standard ipfrag](#standard-ipfrag)
 - arg: [standard reconstruct](#standard-reconstruct)
 - arg: [standard rawsend](#standard-rawsend)
-- arg: pos - a comma-separated list of [markers](#markers) — split points. Default is "2".
-- arg: seqovl - marker — an offset relative to the current sequence to create an additional part of the segment extending to the left.
+- arg: pos - a comma-separated list of [markers](#markers) - split points. Default is "2".
+- arg: seqovl - marker - an offset relative to the current sequence to create an additional part of the segment extending to the left.
 - arg: optional - skip the operation if a blob is specified but missing. If seqovl_pattern is specified but missing, use the 0x00 pattern.
 - arg: seqovl_pattern - the [blob](#blob-transmission) used to fill the seqovl. Default is 0x00.
 
@@ -3639,7 +3639,7 @@ Transmission sequence:
 5. Real 2nd part.
 6. Fake of the 2nd part. (fake4)
 
-The purpose of this technique is to confuse the DPI regarding which data is original and which is fake. Since the segments are identical in size—one containing junk and the other containing real data—the DPI cannot determine which to process. Both appear as retransmissions with identical sequences and sizes.
+The purpose of this technique is to confuse the DPI regarding which data is original and which is fake. Since the segments are identical in size - one containing junk and the other containing real data - the DPI cannot determine which to process. Both appear as retransmissions with identical sequences and sizes.
 
 - Only `fooling_opts.tcp_ts_up` is applied to the original segments; `reconstruct_opts` are not used.
 - Both `fooling_opts` and `reconstruct_opts` are applied in full to the fake segments.
@@ -3660,8 +3660,8 @@ function fakeddisorder(ctx, desync)
 - arg: [standard ipid](#standard-ipid)
 - arg: [standard reconstruct](#standard-reconstruct)
 - arg: [standard rawsend](#standard-rawsend)
-- arg: pos - a single [marker](#markers) — the split point. Defaults to "2".
-- arg: seqovl - [marker](#markers) — offset relative to the current sequence to create an additional segment part extending to the left.
+- arg: pos - a single [marker](#markers) - the split point. Defaults to "2".
+- arg: seqovl - [marker](#markers) - offset relative to the current sequence to create an additional segment part extending to the left.
 - arg: seqovl_pattern - [blob](#passing-blobs) used to fill the seqovl. Defaults to 0x00.
 - arg: blob - replace the current payload with the specified [blob](#passing-blobs).
 - arg: optional - abort the operation if a blob is specified but missing. If seqovl_pattern is specified but missing, use the 0x00 pattern.
@@ -3713,7 +3713,7 @@ function hostfakesplit(ctx, desync)
 - default payload filter - "known"
 
 This is a specialized "splitter" that intersperses fakes for payloads containing a hostname, such as http_req and tls_client_hello.
-The two primary split points are the beginning of the hostname — the [marker](#markers) "host" — and the end of the hostname — the [marker](#markers) "endhost". Additional optional split points include the [marker](#markers) midhost (must be within the host..endhost range) and the [marker](#markers) disorder_after (must be greater than endhost). When splitting by disorder_after, the parts are sent in reverse order.
+The two primary split points are the beginning of the hostname - the [marker](#markers) "host" - and the end of the hostname - the [marker](#markers) "endhost". Additional optional split points include the [marker](#markers) midhost (must be within the host..endhost range) and the [marker](#markers) disorder_after (must be greater than endhost). When splitting by disorder_after, the parts are sent in reverse order.
 [Fooling](#standard-fooling) is required for fakes to prevent them from being accepted by the server.
 
 Transmission sequence:
@@ -3782,7 +3782,7 @@ function udplen(ctx, desync)
 - arg: pattern_offset - initial offset within the pattern
 - default payload filter - "known"
 
-The function increases or decreases the length of the UDP L4 payload. When decreasing, part of the information is truncated and lost; when increasing, the extra space is filled with the `pattern`. UDP segmentation is impossible—if the MTU or PMTU is exceeded, the packet will not reach its destination. An error in case of exceeding the MTU will only be reported on Linux; other systems will silently fail to send the packet (windivert and ipdivert have no means of error detection).
+The function increases or decreases the length of the UDP L4 payload. When decreasing, part of the information is truncated and lost; when increasing, the extra space is filled with the `pattern`. UDP segmentation is impossible - if the MTU or PMTU is exceeded, the packet will be fragmented by OS on IP level. An error in case of exceeding the MTU will only be reported on Linux; other systems will silently fail to send the packet (windivert and ipdivert have no means of error detection).
 
 ### dht_dn
 
@@ -3793,7 +3793,7 @@ function dht_dn(ctx, desync)
 - arg: [standard direction](#standard-direction)
 - arg: dn - the number N following 'd' in a DHT message
 
-DHT uses the bencode format for transmitting messages. 'd' represents the directory data type. DHT messages typically start with 'd1' or 'd2' and end with 'e' (end). Some DPIs have these exact signatures hardcoded—only 'd1' or 'd1'+'d2'. However, one can use 'd3', 'd4', etc., if the content is edited correctly without violating the bencode format. This is what this function does. It only works on payloads with the "dht" type.
+DHT uses the bencode format for transmitting messages. 'd' represents the directory data type. DHT messages typically start with 'd1' or 'd2' and end with 'e' (end). Some DPIs have these exact signatures hardcoded-only 'd1' or 'd1'+'d2'. However, one can use 'd3', 'd4', etc., if the content is edited correctly without violating the bencode format. This is what this function does. It only works on payloads with the "dht" type.
 
 ## Other Functions
 
@@ -3807,7 +3807,7 @@ function synack(ctx, desync)
 - arg: [standard reconstruct](#standard-reconstruct)
 - arg: [standard rawsend](#standard-rawsend)
 
-Sends a SYN,ACK packet before the SYN to confuse the DPI regarding the TCP connection direction. This attack is referred to in literature as "TCB turnaround." It breaks NAT—usage through NAT is impossible. Usage on transit traffic requires nftables and POSTNAT mode. After a non-SYN packet passes, it performs an [instance cutoff](#instance_cutoff). It does not issue a verdict.
+Sends a SYN,ACK packet before the SYN to confuse the DPI regarding the TCP connection direction. This attack is referred to in literature as "TCB turnaround." It breaks NAT-usage through NAT is impossible. Usage on transit traffic requires nftables and POSTNAT mode. After a non-SYN packet passes, it performs an [instance cutoff](#instance_cutoff). It does not issue a verdict.
 
 ### synack_split
 
@@ -3825,17 +3825,17 @@ This technique is intended for servers. In literature, it is known as "TCP split
 Many DPIs expect a standard response to a SYN in the form of a SYN,ACK. In reality, the response to the SYN becomes another SYN, and then the client sends a SYN,ACK to the server. Consequently, the DPI loses track of which side is the client and which is the server, causing the inspection algorithm to fail. The attack may work even if the client does nothing to bypass blocking. It can be used in conjunction with client-side techniques for targeted TCP bypassing.
 
 
-# zapret-auto.lua automation and orchestration Library
+# zapret-auto.lua automation and orchestration library
 
-The standard order of instance application is linear—from left to right, taking into account [in-profile filters](#in-profile-filters) and [instance cutoff](#instance_cutoff). nfqws2 provides no other options by default.
+The standard order of instance application is linear-from left to right, taking into account [in-profile filters](#in-profile-filters) and [instance cutoff](#instance_cutoff). nfqws2 provides no other options by default.
 
-Of course, you can write your own Lua function that does what is needed when it is needed. However, you would have to reinvent the wheel, duplicate code, or worse—patch standard antidpi functions to add your own features and then maintain them yourself.
+Of course, you can write your own Lua function that does what is needed when it is needed. However, you would have to reinvent the wheel, duplicate code, or worse-patch standard antidpi functions to add your own features and then maintain them yourself.
 
 The essence of orchestration mechanisms is to separate the control logic from the logic of the actual actions. This way, nothing needs to be patched, and if you do write your own functions, you only need to write the control algorithm itself without mixing it with action algorithms.
 
 Orchestration is inextricably linked to the concept of an [execution plan](#execution_plan). It includes a list of instances that need to be called sequentially with their parameters and [filters](#in-profile-filters). A basic linear orchestrator is built into the C code, but this role can also be taken over by a Lua function where any logic can be programmed.
 
-For example, you can create automatic strategies—if one doesn't work, use another. The C code has similar logic only within the [automatic hostlist](#filtering-by-lists) mechanism, but it does not implement dynamic strategy switching.
+For example, you can create automatic strategies - if one doesn't work, use another. The C code has similar logic only within the [automatic hostlist](#filtering-by-lists) mechanism, but it does not implement dynamic strategy switching.
 
 ## State storage
 
@@ -3857,8 +3857,8 @@ Returns a table serving as automation state storage bound to the stream. Automat
 function standard_hostkey(desync)
 ```
 
-- arg: reqhost — require a hostname; do not operate via IP.
-- arg: nld — the domain level number to which the hostname is truncated. If not specified, no truncation occurs.
+- arg: reqhost - require a hostname; do not operate via IP.
+- arg: nld - the domain level number to which the hostname is truncated. If not specified, no truncation occurs.
 
 A standard host-key generator. This function calculates a key string associated with the hostname or the IP address if the hostname is unavailable. If it fails to generate a key, it returns `nil`.
 
@@ -3868,14 +3868,14 @@ A standard host-key generator. This function calculates a key string associated 
 function automate_host_record(desync)
 ```
 
-- arg: key — a key within the global `autostate` table. If not specified, the current instance name is used as the key.
-- arg: hostkey — the name of the host-key generator function. If not specified, [standard_hostkey](#standard_hostkey) is used.
+- arg: key - a key within the global `autostate` table. If not specified, the current instance name is used as the key.
+- arg: hostkey - the name of the host-key generator function. If not specified, [standard_hostkey](#standard_hostkey) is used.
 
 Returns a table serving as automation state storage bound to a specific host or IP address. It utilizes two keys: `key` and `hostkey`. The resulting location is `autostate.key.hostkey`. If the `hostkey` cannot be retrieved, it returns `nil`.
 
 ## Handling successes and failures
 
-A simple, though not entirely precise, explanation of "success" and "failure" is "the site opens" versus "the site does not open." In automation logic, these states are abstract. Any process can result in a success or a failure. Detecting these states is necessary for tracking failures via a counter. The counter increments on failure and resets on success. When a target threshold is reached, a flag is returned, allowing external logic to perform an action—such as switching strategies.
+A simple, though not entirely precise, explanation of "success" and "failure" is "the site opens" versus "the site does not open." In automation logic, these states are abstract. Any process can result in a success or a failure. Detecting these states is necessary for tracking failures via a counter. The counter increments on failure and resets on success. When a target threshold is reached, a flag is returned, allowing external logic to perform an action-such as switching strategies.
 
 ### automate_failure_counter
 
@@ -3883,10 +3883,10 @@ A simple, though not entirely precise, explanation of "success" and "failure" is
 function automate_failure_counter(hrec, crec, fails, maxtime)
 ```
 
-- hrec — [host storage](#automate_host_record)
-- crec — [stream storage](#automate_conn_record)
-- fails — the target number of failures.
-- maxtime — the time in seconds after which, since the last failure, the next failure restarts the count from scratch.
+- hrec - [host storage](#automate_host_record)
+- crec - [stream storage](#automate_conn_record)
+- fails - the target number of failures.
+- maxtime - the time in seconds after which, since the last failure, the next failure restarts the count from scratch.
 
 Returns `true` if the counter reaches the `fails` value. The counter is reset upon returning `true`.
 
@@ -3896,7 +3896,7 @@ Returns `true` if the counter reaches the `fails` value. The counter is reset up
 function automate_failure_counter_reset(hrec)
 ```
 
-- hrec — [host storage](#automate_host_record)
+- hrec - [host storage](#automate_host_record)
 
 Resets the failure counter value.
 
@@ -3910,12 +3910,12 @@ Success and failure detectors are swappable functions that take `desync` and [cr
 function automate_failure_check(desync, hrec, crec)
 ```
 
-- hrec — [host storage](#automate_host_record)
-- crec — [stream storage](#automate_conn_record)
-- arg: success_detector — the name of the success detector function. Defaults to `standard_success_detector` if not specified.
-- arg: failure_detector — the name of the failure detector function. Defaults to `standard_failure_detector` if not specified.
-- arg: fails — the target failure counter value. Default is 3.
-- arg: maxtime — the maximum time in seconds between failures before the counter resets. Default is 60 seconds.
+- hrec - [host storage](#automate_host_record)
+- crec - [stream storage](#automate_conn_record)
+- arg: success_detector - the name of the success detector function. Defaults to `standard_success_detector` if not specified.
+- arg: failure_detector - the name of the failure detector function. Defaults to `standard_failure_detector` if not specified.
+- arg: fails - the target failure counter value. Default is 3.
+- arg: maxtime - the maximum time in seconds between failures before the counter resets. Default is 60 seconds.
 
 This function maintains the failure counter by invoking the success and failure detectors. It returns `true` if the counter reaches the target value. The counter resets automatically in this case.
 
@@ -3967,7 +3967,7 @@ function circular(ctx, desync)
 - arg: (standard detector only) [standard success detector](#standard_success_detector)
 - arg: (standard detector only) [standard failure detector](#standard_failure_detector)
 
-This orchestrator tracks failures and cycles through strategies once the failure counter reaches the `fails` target. All subsequent instances are labeled with a "strategy" argument containing the strategy number, starting from 1. Instances without a "strategy" argument are not called by `circular`. Strategy numbers must be continuous from 1 to the last; gaps are not allowed and will trigger an error. If any instance of strategy N includes a "final" argument, that strategy becomes the last one—further cycling is blocked.
+This orchestrator tracks failures and cycles through strategies once the failure counter reaches the `fails` target. All subsequent instances are labeled with a "strategy" argument containing the strategy number, starting from 1. Instances without a "strategy" argument are not called by `circular`. Strategy numbers must be continuous from 1 to the last; gaps are not allowed and will trigger an error. If any instance of strategy N includes a "final" argument, that strategy becomes the last one-further cycling is blocked.
 
 Usage example:
 
@@ -4018,8 +4018,8 @@ The first `repeater` is not restricted by `stop`, so it proceeds to execute `3`.
 function condition(ctx, desync)
 ```
 
-- arg: `iff` — name of the [iff function](#iff-functions)
-- arg: `neg` — invert the `iff` value; defaults to `false`
+- arg: `iff` - name of the [iff function](#iff-functions)
+- arg: `neg` - invert the `iff` value; defaults to `false`
 
 `condition` calls `iff`. If `iff xor neg = true`, all instances in the `plan` are executed; otherwise, the plan is cleared.
 
@@ -4029,8 +4029,8 @@ function condition(ctx, desync)
 function condition(ctx, desync)
 ```
 
-- arg: `iff` — name of the [iff function](#iff-functions)
-- arg: `neg` — invert the `iff` value; defaults to `false`
+- arg: `iff` - name of the [iff function](#iff-functions)
+- arg: `neg` - invert the `iff` value; defaults to `false`
 
 `stopif` calls `iff`. If `iff xor neg = true`, the plan is cleared; otherwise, no action is taken.
 
@@ -4063,7 +4063,7 @@ Always returns `false`.
 function cond_random(desync)
 ```
 
-- arg: `percent` — the probability of returning `true`. Defaults to 50.
+- arg: `percent` - the probability of returning `true`. Defaults to 50.
 
 Returns `true` randomly based on the `percent` probability; otherwise returns `false`.
 
@@ -4073,7 +4073,7 @@ Returns `true` randomly based on the `percent` probability; otherwise returns `f
 function cond_payload_str(desync)
 ```
 
-- arg: `pattern` — the string to search for in the payload.
+- arg: `pattern` - the string to search for in the payload.
 
 Returns `true` if the substring `pattern` is present in `desync.dis.payload`.
 This is a basic signature detector. If the C code does not recognize the protocol you need, you can write your own signature detector and run subsequent instances under a `condition` orchestrator using your detector as the `iff` function.
@@ -4179,7 +4179,7 @@ If you need to record a log, use standard shell tools:
 
 `/opt/zapret2/blockcheck2.sh | tee /tmp/blockcheck2.log`
 
-In the [win bundle](https://github.com/bol-van/zapret-win-bundle), you can use the cygwin prompt (`cygwin/cygwin-admin.cmd`). Aliases have already been created there to launch blockcheck from the first version of zapret, blockcheck2, winws, and winws2 with the standard Lua scripts already connected. This is convenient because you don't have to worry about file paths or repeatedly typing or pasting long strings of text—especially when dealing with national characters and spaces in paths, which can lead to confusion with character escaping and encodings.
+In the [win bundle](https://github.com/bol-van/zapret-win-bundle), you can use the cygwin prompt (`cygwin/cygwin-admin.cmd`). Aliases have already been created there to launch blockcheck from the first version of zapret, blockcheck2, winws, and winws2 with the standard Lua scripts already connected. This is convenient because you don't have to worry about file paths or repeatedly typing or pasting long strings of text-especially when dealing with national characters and spaces in paths, which can lead to confusion with character escaping and encodings.
 
 Sequential testing of multiple domains is possible. To do this, specify them separated by spaces.
 
@@ -4189,7 +4189,7 @@ blockcheck2 is not a panacea; it is not a tool for generating "magic strings" th
 
 You should also not expect highly complex strategy selection algorithms from blockcheck. Shell scripts are not a full-fledged programming language and lack the tools to work with complex data structures. Shell programming often becomes a struggle when dealing with complex data, as it must somehow be recorded into a linear set of environment variables.
 
-blockcheck2 works on all supported platforms: Linux, FreeBSD, OpenBSD, and Windows. On Windows, the easiest way to use it is through the [win bundle](https://github.com/bol-van/zapret-win-bundle)—a minimal cygwin system pre-configured for zapret.
+blockcheck2 works on all supported platforms: Linux, FreeBSD, OpenBSD, and Windows. On Windows, the easiest way to use it is through the [win bundle](https://github.com/bol-van/zapret-win-bundle)-a minimal cygwin system pre-configured for zapret.
 
 ## DNS check
 
@@ -4222,15 +4222,15 @@ The `SECURE_DNS` variable allows you to manually disable the switch to DoH or, c
 
 ### Multiple attempts
 
-Strategy instability is a common phenomenon. A provider might use load balancing, causing different requests to pass through different DPI systems. As a result, a strategy might work one moment and fail the next. Strategy stability is tested through multiple repetitions—attempts. The number of attempts is set either in the dialog or via [shell variables](#shell-variables).
+Strategy instability is a common phenomenon. A provider might use load balancing, causing different requests to pass through different DPI systems. As a result, a strategy might work one moment and fail the next. Strategy stability is tested through multiple repetitions-attempts. The number of attempts is set either in the dialog or via [shell variables](#shell-variables).
 
-Parallel mode is [supported](#shell-variables). In this mode, each attempt is executed in a separate child process, and results are then aggregated from all processes. This mode is enabled only via the [PARALLEL variable](#shell-variables). It can significantly speed up testing but may also trigger a rate limit—a situation where the server restricts or bans you due to excessive hammering.
+Parallel mode is [supported](#shell-variables). In this mode, each attempt is executed in a separate child process, and results are then aggregated from all processes. This mode is enabled only via the [PARALLEL variable](#shell-variables). It can significantly speed up testing but may also trigger a rate limit-a situation where the server restricts or bans you due to excessive hammering.
 
 ### Scanning levels
 
-- **standard** — uses a test algorithm that excludes strategies deemed irrelevant based on previous successes or other criteria. In the case of multiple attempts, testing does not stop upon failure. The success rate and curl errors can also provide useful information for situational analysis.
-- **quick** — same as standard, but when using multiple attempts, testing stops after the first failure.
-- **force** — tests as extensively as possible, regardless of previous test results.
+- **standard** - uses a test algorithm that excludes strategies deemed irrelevant based on previous successes or other criteria. In the case of multiple attempts, testing does not stop upon failure. The success rate and curl errors can also provide useful information for situational analysis.
+- **quick** - same as standard, but when using multiple attempts, testing stops after the first failure.
+- **force** - tests as extensively as possible, regardless of previous test results.
 
 ### Supported protocols
 
@@ -4245,11 +4245,11 @@ TLS 1.3 provides minimal unencrypted information during the TLS Server Hello. Th
 zapret cannot bypass IP-based blocks.
 IP blocks come in various forms.
 
-1. **Full IP block.** Absolutely nothing gets through—no pings, no port connections. Communication is impossible without a proxy.
+1. **Full IP block.** Absolutely nothing gets through-no pings, no port connections. Communication is impossible without a proxy.
 2. **Port or L4 protocol block.** For example, pings (ICMP) work, but no TCP ports connect, while UDP traffic still passes. Alternatively, a specific port like TCP 443 might be blocked. A TCP port block means all packets with that destination port are dropped. The connection hangs on an endless loop of sending SYN requests; the 3-way handshake never completes. Communication is impossible without a proxy.
-3. **Partial IP/port block.** The 3-way handshake completes successfully, but after that, anything you send results in a hang or an RST (reset) packet. The very fact that the connection establishes suggests the potential existence of "whitelisted" messages that could grant access. These might be requests with approved SNIs or packets using a different protocol altogether—something other than TLS. You can only bypass this block if you have specific information on how to "pierce" it, or if you are technically proficient and persistent enough to test various options manually.
+3. **Partial IP/port block.** The 3-way handshake completes successfully, but after that, anything you send results in a hang or an RST (reset) packet. The very fact that the connection establishes suggests the potential existence of "whitelisted" messages that could grant access. These might be requests with approved SNIs or packets using a different protocol altogether - something other than TLS. You can only bypass this block if you have specific information on how to "pierce" it, or if you are technically proficient and persistent enough to test various options manually.
 
-**blockcheck2** is designed to assist in identifying IP blocks, but it does not provide an automated verdict—you must decide whether a block exists based on its actions.
+**blockcheck2** is designed to assist in identifying IP blocks, but it does not provide an automated verdict - you must decide whether a block exists based on its actions.
 
 The first step is checking port availability via `nc` or `ncat`. These must be installed, as they may not be included in your system out of the box. `ncat` is preferred because it offers more features and handles IPv6 reliably. If neither is installed, the test is canceled. Automated decision-making is hindered by the inconsistent exit codes across different versions of netcat. Some versions do not return success or failure codes at all, providing only version-specific text messages.
 
@@ -4259,7 +4259,7 @@ Next, a partial IP block is tested using `curl`. This investigates scenarios whe
 
 Evaluating the success or failure of these checks is the main challenge, which is why the interpretation falls to the user. What constitutes "success" or "failure"? This varies wildly and can depend on both the DPI (Deep Packet Inspection) system and the server itself.
 
-For example, a TLS error when requesting `iana.org` via the IP of `rutracker.org` might actually indicate success. A certificate error can be either a success or a failure—an invalid certificate could be returned by the server itself or by the DPI via a Man-in-the-Middle (MiTM) attack. It is crucial to determine whether the server returned *any* response and whether that response truly came from the server or was generated by the DPI. A TLS alert when requesting a domain not hosted on that server is normal and common. Conversely, some servers are configured to serve a page regardless of the SNI provided in the TLS handshake—this is also normal.
+For example, a TLS error when requesting `iana.org` via the IP of `rutracker.org` might actually indicate success. A certificate error can be either a success or a failure-an invalid certificate could be returned by the server itself or by the DPI via a Man-in-the-Middle (MiTM) attack. It is crucial to determine whether the server returned *any* response and whether that response truly came from the server or was generated by the DPI. A TLS alert when requesting a domain not hosted on that server is normal and common. Conversely, some servers are configured to serve a page regardless of the SNI provided in the TLS handshake - this is also normal.
 
 A hang is usually a sign of failure, but it could also result from server-side issues or the server banning your IP. An RST is likely a failure, but it could be a legitimate response from the server or its DDoS protection system.
 
@@ -4447,11 +4447,11 @@ A browser does far more than that. So, what's the difference?
 3. A browser's goal is to open a site as quickly as possible without burdening the user with technical jargon that sounds like Greek to them. Therefore, it attempts to reach the site using various protocols to ensure the page opens faster. It might jump between IPv4 and IPv6, or between TLS and QUIC. That’s already four combinations. Each of these requires a separate `blockcheck` test. Did a single strategy bypass all of them? Did you migrate these strategies to your working config correctly? Did you merge them properly?
 4. A particularly important parameter is Kyber. This post-quantum cryptography turns a single-packet TLS/QUIC request into a 2 or 3-packet one. This is a significant factor in DPI circumvention. Modern browsers usually use Kyber. For `curl`, it depends on the version and the age of the crypto library it is linked with. OpenSSL 3.5.0 supports Kyber; older versions do not. LibreSSL or mbedTLS do not support Kyber yet. But they will tomorrow, because that is where the trend is heading.
 5. Censors will use any dirty trick available. Sometimes they even target the client's fingerprint. What is that? Primarily, it is the presence and order of TLS extensions characteristic of a specific browser or `curl`. If they cannot ban the IP addresses but need to eliminate a new VPN client, they analyze its handshake, find unique features, and block based on them. If something else breaks in the process, they simply don't care.
-6. ECH (Encrypted Client Hello) is a technology for encrypted SNI transmission designed to prevent censors from seeing which resource is being accessed. It is an excellent technology, but unfortunately, it arrived too late. It missed the window to become an undisputed de facto standard. Consequently, they may block based on the presence of ECH itself or by the decoy SNI—for Cloudflare, this is "cloudflare-ech.com". `curl` might hit a site without ECH while the browser uses it—hence the discrepancy.
+6. ECH (Encrypted Client Hello) is a technology for encrypted SNI transmission designed to prevent censors from seeing which resource is being accessed. It is an excellent technology, but unfortunately, it arrived too late. It missed the window to become an undisputed de facto standard. Consequently, they may block based on the presence of ECH itself or by the decoy SNI-for Cloudflare, this is "cloudflare-ech.com". `curl` might hit a site without ECH while the browser uses it-hence the discrepancy.
 7. TLS protocol version. By default, `blockcheck2` tests TLS 1.2 as the most difficult case to bypass. A browser will most likely use TLS 1.3. There have been cases where censors intentionally blocked the TLS 1.3 protocol because it is used and required by the popular VLESS-REALITY bypass method. The level of disregard for collateral damage is now so high that breaking numerous legitimate resources no longer stops them.
 
-8. The famous "16 KB" block. How do you test for a 16 KB block? Hit a URI with `curl` where the site returns a sufficiently long page. If the download hangs in the middle, that's it. By default, `blockcheck2` uses `HEAD` requests for HTTPS to avoid taxing the server and to save traffic—since nothing is visible under HTTPS anyway. This can be changed via [CURL_HTTPS_GET=1](#shell-variables). However, doing so will likely result in a stream of "UNAVAILABLE" errors. The standard option provides strategies that work when bypassing the 16 KB block, making it more informative. Why do they do this? The goal is to force everyone into Russian jurisdiction, and to achieve this, they are squeezing major hosting providers—Cloudflare, Hetzner, Akamai, AWS, and others. CDNs are often used for hidden proxy or VPN tunneling. They have to leave a few critical sites accessible. For example, hp.com—where else are you going to download LaserJet drivers? And HP is hosted on one of these providers. This creates a whitelist. Consequently, you need a payload that satisfies this whitelist. The trouble is that `blockcheck`, much like `zapret` itself, is merely a tool. It does not include ready-made recipes. You need to find what works to bypass specific hosts yourself. This is the situation today; tomorrow it will be something else. The author will not chase every change or constantly update `blockcheck` to give you ready-to-use copy-paste recipes. You need to analyze the situation and find a solution yourself. Currently, "16 KB" style whitelists are bypassed either by using a whitelisted SNI or some other whitelisted protocol type that isn't TLS. Tomorrow it will be something else. The [standard checker](#standard-test) accepts a whole list of variables for scan customization. There is an option to [insert something before and something after](#shell-variables) the strategy. Finally, `blockcheck` isn't the only option; sometimes it's more convenient to check things manually.
-9. Following up on the previous point—the practice of implementing specific rules on certain IP ranges has become widespread. Therefore, you might find a strategy that works for most resources but fails on others.
+8. The famous "16 KB" block. How do you test for a 16 KB block? Hit a URI with `curl` where the site returns a sufficiently long page. If the download hangs in the middle, that's it. By default, `blockcheck2` uses `HEAD` requests for HTTPS to avoid taxing the server and to save traffic-since nothing is visible under HTTPS anyway. This can be changed via [CURL_HTTPS_GET=1](#shell-variables). However, doing so will likely result in a stream of "UNAVAILABLE" errors. The standard option provides strategies that work when bypassing the 16 KB block, making it more informative. Why do they do this? The goal is to force everyone into Russian jurisdiction, and to achieve this, they are squeezing major hosting providers : Cloudflare, Hetzner, Akamai, AWS, and others. CDNs are often used for hidden proxy or VPN tunneling. They have to leave a few critical sites accessible. For example, hp.com-where else are you going to download LaserJet drivers? And HP is hosted on one of these providers. This creates a whitelist. Consequently, you need a payload that satisfies this whitelist. The trouble is that `blockcheck`, much like `zapret` itself, is merely a tool. It does not include ready-made recipes. You need to find what works to bypass specific hosts yourself. This is the situation today; tomorrow it will be something else. The author will not chase every change or constantly update `blockcheck` to give you ready-to-use copy-paste recipes. You need to analyze the situation and find a solution yourself. Currently, "16 KB" style whitelists are bypassed either by using a whitelisted SNI or some other whitelisted protocol type that isn't TLS. Tomorrow it will be something else. The [standard checker](#standard-test) accepts a whole list of variables for scan customization. There is an option to [insert something before and something after](#shell-variables) the strategy. Finally, `blockcheck` isn't the only option; sometimes it's more convenient to check things manually.
+9. Following up on the previous point-the practice of implementing specific rules on certain IP ranges has become widespread. Therefore, you might find a strategy that works for most resources but fails on others.
 10. There are reports of DPI behavior in the "punish the troublemaker" style. The DPI detects attempts to fool it and temporarily blocks access by IP. It might work once or twice, and then no connections go through. If the IP is dynamic, reconnecting to the ISP helps, but only until the next attempt. Another variation involves sending a UDP packet to a trigger IP (for example, via a torrent client) followed by a block of certain IP ranges. The author has not encountered such blocks personally, but dynamic blocking is the path China has already taken. It can be expected in Russia as well.
 11. Strategy instability. Load balancing at the ISP level is a frequent occurrence. Traffic may pass through one DPI instance one moment and another the next, causing a strategy to work only intermittently. By default, `blockcheck2` only tests a single attempt. If there are doubts about stability, you should increase the number of attempts to at least 5. You can use [PARALLEL=1](#shell-variables), but this may trigger the resource's own protection against aggressive hammering.
 The main goal of those implementing the blocks is to eliminate mass circumvention.
@@ -4466,7 +4466,7 @@ Official support is guaranteed only for OpenWrt, starting from version 18. On ol
 
 nfqws2 can also operate standalone without startup scripts. However, you will need to handle the automatic startup, parameter passing, and firewall configuration yourself.
 
-On Windows, no dedicated startup system is required—everything is typically handled by batch files to run winws2 in interactive mode or to manage the service.
+On Windows, no dedicated startup system is required-everything is typically handled by batch files to run winws2 in interactive mode or to manage the service.
 
 On BSD, only the ipset list retrieval system is functional. On FreeBSD, it can load ipsets (tables) into ipfw. On OpenBSD, pf loads the IP list files directly.
 
@@ -4562,9 +4562,9 @@ It takes one command-line parameter. This can be "clear" (to clear ipsets) or "n
 
 ipset names:
 
-- nozapret, nozapret6 — IP address exclusions
-- zapret, zapret6 — IP address inclusions
-- ipban, ipban6 — a separate inclusion list for third-party redirection or proxying
+- nozapret, nozapret6 - IP address exclusions
+- zapret, zapret6 - IP address inclusions
+- ipban, ipban6 - a separate inclusion list for third-party redirection or proxying
 
 ipfw uses sets that include both IPv4 and IPv6 addresses, so the "6" variants are not used.
 
@@ -4632,7 +4632,7 @@ A typical `ipban` usage scenario begins with creating an ipset from the saved li
 create_ipset no-update
 ```
 
-You cannot be certain which will start first—your script or `zapret`.
+You cannot be certain which will start first-your script or `zapret`.
 Startup must be synchronized and should not run in parallel.
 The best way to achieve this is by using [INIT_FW_*_HOOK](#config-file).
 
@@ -4653,7 +4653,7 @@ The sysv variant is intended for any Linux distribution other than OpenWRT. On s
 
 ### Firewall integration
 
-If the OS uses a firewall management system, conflicts may occur between it and zapret. Most commonly, these manifest as race conditions—a competition over who populates the rules first or clears the other's rules. This leads to chaos: sometimes it works, sometimes it doesn't, or only one component functions, making the overall state unpredictable. Race conditions usually happen with iptables because it uses shared tables. nftables generally avoids these issues since each application uses its own table. However, if the firewall management system decides to flush the entire ruleset, a race condition will still occur.
+If the OS uses a firewall management system, conflicts may occur between it and zapret. Most commonly, these manifest as race conditions-a competition over who populates the rules first or clears the other's rules. This leads to chaos: sometimes it works, sometimes it doesn't, or only one component functions, making the overall state unpredictable. Race conditions usually happen with iptables because it uses shared tables. nftables generally avoids these issues since each application uses its own table. However, if the firewall management system decides to flush the entire ruleset, a race condition will still occur.
 
 If you encounter race conditions or conflicts, the best solution is synchronization. Disable `INIT_APPLY_FW` in the [config](#config-file) file; this prevents the `start` command scripts from launching the firewall and creating a conflict. Next, determine how to trigger a third-party script to apply additional rules once your system's primary firewall is up. This script should be `zapret2 start_fw`. You can also integrate `stop_fw` and `restart_fw` in a similar fashion. Alternatively, you can take the opposite approach: use the `zapret` firewall initialization as a base and utilize [firewall hooks](#config-file) to trigger your system's firewall management commands. Ensure that your firewall management system does not overwrite or wipe the `zapret` rules.
 
@@ -4665,16 +4665,16 @@ OpenWRT comes with ready-made firewall integration. The startup scripts automati
 
 ### Custom scripts
 
-The standard [NFQWS2_OPT](#config-file) instance cannot always solve highly specific tasks. Interception is performed only by port. There is no way to include additional conditions—for example, intercepting a specific payload on any port, setting a specific `connbytes` filter, or using a special kernel `ipset` to apply unique strategies to that intercepted traffic.
+The standard [NFQWS2_OPT](#config-file) instance cannot always solve highly specific tasks. Interception is performed only by port. There is no way to include additional conditions-for example, intercepting a specific payload on any port, setting a specific `connbytes` filter, or using a special kernel `ipset` to apply unique strategies to that intercepted traffic.
 
 Since these requirements are often very specific, they are not included in the core functionality. Instead, a system of custom scripts has been created. These are shell includes located in `init.d/sysv/custom.d` or `init.d/openwrt/custom.d`. Their primary task is to apply the firewall rules you need and launch `nfqws2` instances with the required parameters. Other auxiliary actions are also possible.
 
 A custom script can contain the following shell functions, which are called by the startup system:
 
-- **zapret_custom_daemons** — starts and stops daemons. `$1 = 1` for start, `0` for stop.
-- **zapret_custom_firewall** — applies and removes `iptables` rules. `$1 = 1` for apply, `0` for remove.
-- **zapret_custom_firewall_nft** — applies `nftables` rules. A stop function is not required because the main code clears the `nft` chains along with custom rules upon stopping.
-- **zapret_custom_firewall_nft_flush** — called when `nftables` is stopped to allow for the removal of objects outside the standard chains, such as custom sets or custom chains.
+- **zapret_custom_daemons** - starts and stops daemons. `$1 = 1` for start, `0` for stop.
+- **zapret_custom_firewall** - applies and removes `iptables` rules. `$1 = 1` for apply, `0` for remove.
+- **zapret_custom_firewall_nft** - applies `nftables` rules. A stop function is not required because the main code clears the `nft` chains along with custom rules upon stopping.
+- **zapret_custom_firewall_nft_flush** - called when `nftables` is stopped to allow for the removal of objects outside the standard chains, such as custom sets or custom chains.
 
 If you do not need `iptables` or `nftables`, you do not need to write functions for that specific firewall type. It is highly recommended to use the core code's helpers within these functions; this allows you to follow the startup script ideology without needing to focus on low-level details. You can freely reference variables from the [config](#config-file) and add your own.
 
@@ -4695,7 +4695,7 @@ alloc_qnum()
 
 Functions for obtaining dynamic numbers from the pool are necessary to prevent conflicts between different startup scripts. A queue number is a unique value; two instances cannot bind to the same queue, as the second one will fail with an error. A daemon number is required for PID tracking. If numbers overlap, start/stop/restart operations will not function correctly.
 
-These functions should be called from the main body of the script, not from within a function. Custom scripts are always executed in alphabetical order—this is the standard scheme for ".d" directories in Unix. Given the same set of scripts, the same `qnum` and `dnum` values will always be returned for each script during both startup and shutdown. This allows them to be used as unique identifiers without colliding with other scripts. If the composition of custom scripts is changed after startup, this rule is broken, which will lead to issues. Therefore, it is best not to modify the set of custom scripts while zapret2 is running.
+These functions should be called from the main body of the script, not from within a function. Custom scripts are always executed in alphabetical order-this is the standard scheme for ".d" directories in Unix. Given the same set of scripts, the same `qnum` and `dnum` values will always be returned for each script during both startup and shutdown. This allows them to be used as unique identifiers without colliding with other scripts. If the composition of custom scripts is changed after startup, this rule is broken, which will lead to issues. Therefore, it is best not to modify the set of custom scripts while zapret2 is running.
 
 ##### Working with daemons
 
@@ -4794,11 +4794,11 @@ A set of functions for managing iptables rules. All functions that add rules fir
 
 All rules begin with the chain name, omitting iptables commands such as `-A`, `-D`, `-I`, etc.
 
-- `ipt` — iptables -I — prepend to the beginning.
-- `ipta` — iptables -A — append to the end.
-- `ipt_del` — iptables -D — delete.
-- `ipt_add_del` — add via -I or delete. `$1`: 1 for addition, 0 for deletion. The rule itself starts from `$2`.
-- `ipta_add_del` — same as above, but uses -A instead of -I.
+- `ipt` - iptables -I - prepend to the beginning.
+- `ipta` - iptables -A - append to the end.
+- `ipt_del` - iptables -D - delete.
+- `ipt_add_del` - add via -I or delete. `$1`: 1 for addition, 0 for deletion. The rule itself starts from `$2`.
+- `ipta_add_del` - same as above, but uses -A instead of -I.
 
 ```
 ipt_first_packets()
@@ -4825,7 +4825,7 @@ Rules are prefixed with `$FW_EXTRA_PRE` and suffixed with `$FW_EXTRA_POST`.
 
 What should NOT be included in the filter:
 
-- Checks for standard exclude ipsets — `nozapret`, `nozapret6`.
+- Checks for standard exclude ipsets - `nozapret`, `nozapret6`.
 - Checks based on [DESYNC_FWMARK](#config-file).
 
 Whether rules are applied for each IP version depends on the [config](#config-file) settings.
@@ -4850,7 +4850,7 @@ nft_reverse_nfqws_rule()
 # $@ - nftables filter rule
 ```
 
-Reverses nftables filter elements from the forward to the reverse direction — replaces `dst` with `src`. The result is output to stdout.
+Reverses nftables filter elements from the forward to the reverse direction - replaces `dst` with `src`. The result is output to stdout.
 
 ```
 nft_add_chain()
@@ -4902,10 +4902,10 @@ Many useful helpers are located in `common/base.sh`. Their purpose is easily und
 
 Consists of the files `install_bin.sh`, `install_prereq.sh`, `install_easy.sh`, and `uninstall_easy.sh`. These utilize files from the `common` directory.
 
-- `install_bin.sh` — an automated tool for finding and configuring architecture-appropriate binary files from the `binaries` folder. It creates symlinks in the `nfq2`, `mdig`, and `ip2net` directories pointing to files within one of the subdirectories in `binaries`. It is specifically designed for stripped-down firmware where many standard utilities are missing. While it works on almost everything, it is not 100% foolproof. The absence or limited functionality of a standard system utility might break the script—a common issue with unsupported firmwares like Padavan, Merlin, and similar. If it fails, create the symlinks manually.
-- `install_prepreq.sh` — a prerequisite installer for the packages required for zapret to function. It works on OpenWRT and most Linux distributions, but not all, as package management systems and individual system configurations vary significantly. If the script fails, you must install the packages manually.
-- `install_easy.sh` — the main installer. Designed to be run from any location. It operates in an interactive mode, prompting the user with questions. It automatically configures binaries and installs prerequisites (no need to run the previous scripts separately). On unsupported Linux systems, it cannot configure autostart—you will have to do this manually.
-- `uninstall_easy.sh` — the uninstaller. It cannot remove autostart on unsupported systems. It offers to remove prerequisites only on OpenWRT; on other systems, it does not. It does not delete the installation directory itself—to remove it completely, you must delete it manually.
+- `install_bin.sh` - an automated tool for finding and configuring architecture-appropriate binary files from the `binaries` folder. It creates symlinks in the `nfq2`, `mdig`, and `ip2net` directories pointing to files within one of the subdirectories in `binaries`. It is specifically designed for stripped-down firmware where many standard utilities are missing. While it works on almost everything, it is not 100% foolproof. The absence or limited functionality of a standard system utility might break the script-a common issue with unsupported firmwares like Padavan, Merlin, and similar. If it fails, create the symlinks manually.
+- `install_prepreq.sh` - a prerequisite installer for the packages required for zapret to function. It works on OpenWRT and most Linux distributions, but not all, as package management systems and individual system configurations vary significantly. If the script fails, you must install the packages manually.
+- `install_easy.sh` - the main installer. Designed to be run from any location. It operates in an interactive mode, prompting the user with questions. It automatically configures binaries and installs prerequisites (no need to run the previous scripts separately). On unsupported Linux systems, it cannot configure autostart-you will have to do this manually.
+- `uninstall_easy.sh` - the uninstaller. It cannot remove autostart on unsupported systems. It offers to remove prerequisites only on OpenWRT; on other systems, it does not. It does not delete the installation directory itself. To remove it completely, you must delete it manually.
 
 The individual files `install_bin.sh` and `install_prereq.sh` are useful when you do not intend to perform a full installation but need a working [blockcheck2](#blockcheck2) or want to run the [startup scripts](#startup-scripts) manually.
 
@@ -4942,7 +4942,7 @@ uci set firewall.@include[-1].reload=1
 uci commit
 ```
 
-4. List updates — a cron job calling `/opt/zapret2/ipset/get_config.sh` at a random time during the night every 2 days to update lists. This assumes the router runs 24/7.
+4. List updates - a cron job calling `/opt/zapret2/ipset/get_config.sh` at a random time during the night every 2 days to update lists. This assumes the router runs 24/7.
 
 ### OpenWRT cheat sheet
 
@@ -4963,7 +4963,7 @@ systemctl daemon-reload
 systemctl enable zapret2
 ```
 
-2. List update timer — runs at a random time of day every 2 days. It is designed for any system, including desktops that may only be powered on during the day.
+2. List update timer - runs at a random time of day every 2 days. It is designed for any system, including desktops that may only be powered on during the day.
 
 ```
 cp /opt/zapret2/init.d/systemd/zapret2-list-update.* /lib/systemd/system
@@ -4990,7 +4990,7 @@ ln -s /opt/zapret2/init.d/openrc/zapret2 /etc/init.d
 rc-update add zapret2
 ```
 
-2. List updates — a cron job to call `/opt/zapret2/ipset/get_config.sh` at a random time during the day every 2 days. This is designed for any system, including desktops that may only be powered on during the day.
+2. List updates - a cron job to call `/opt/zapret2/ipset/get_config.sh` at a random time during the day every 2 days. This is designed for any system, including desktops that may only be powered on during the day.
 
 ### OpenRC cheat sheet
 
@@ -5014,7 +5014,7 @@ On classic Linux distributions with systemd, you can use the provided template u
 7. Stop: `systemctl stop nfqws2@INSTANCE`
 8. Restart: `systemctl restart nfqws2@INSTANCE`
 
-This method does not apply ip/nf tables rules — you will have to handle that separately, as well as write the rules themselves. The rules must be placed somewhere so they are applied after the system starts. For example, you can create a separate systemd unit that runs a shell script or `nft -f /path/to/file.nft`.
+This method does not apply ip/nf tables rules - you will have to handle that separately, as well as write the rules themselves. The rules must be placed somewhere so they are applied after the system starts. For example, you can create a separate systemd unit that runs a shell script or `nft -f /path/to/file.nft`.
 
 ## Other firmwares
 
@@ -5041,7 +5041,7 @@ If the system reports missing basic programs, you should install them via Entwar
 Before running the script, the path to these additional programs must be added to your `PATH`.
 
 Note that Entware is patched to replace standard file paths like `/etc/passwd` with `/opt/etc/passwd`.
-Zapret's static binaries are built without accounting for this, so the `--user` option may not work—the system looks for the user in `/etc/passwd` (which is on a read-only partition), while `adduser` adds users to `/opt/etc/passwd`.
+Zapret's static binaries are built without accounting for this, so the `--user` option may not work-the system looks for the user in `/etc/passwd` (which is on a read-only partition), while `adduser` adds users to `/opt/etc/passwd`.
 Therefore, you may need to uncomment `WS_USER` in the [config](#config-file) and specify a user that already exists in `/etc/passwd`.
 
 For Keenetic devices, there are additional critical nuances; without addressing them, `zapret` will either crash every few minutes or fail to work with UDP.
@@ -5052,7 +5052,7 @@ A detailed description of settings for other firmwares is beyond the scope of th
 OpenWrt is one of the few relatively full-featured Linux systems for embedded devices.
 It was chosen for this project based on the following characteristics:
 * Full root access to the device via shell. This is usually absent in factory firmwares but present in many alternative ones.
-* Read/write (r/w) root partition. This is a nearly unique feature of OpenWrt. Factory and most alternative firmwares are built on a squashfs root (r/o), where configurations are stored in a specially formatted area of internal memory called NVRAM. Systems without an r/w root are severely limited; they cannot install software from repositories without complex workarounds and are primarily designed for users who are only slightly more advanced than average, offering fixed functionality managed through a web interface. Alternative firmwares can usually mount an r/w partition to some area of the file system, while factory firmwares typically only mount USB drives—and even then, they may only support FAT and NTFS rather than Unix file systems.
+* Read/write (r/w) root partition. This is a nearly unique feature of OpenWrt. Factory and most alternative firmwares are built on a squashfs root (r/o), where configurations are stored in a specially formatted area of internal memory called NVRAM. Systems without an r/w root are severely limited; they cannot install software from repositories without complex workarounds and are primarily designed for users who are only slightly more advanced than average, offering fixed functionality managed through a web interface. Alternative firmwares can usually mount an r/w partition to some area of the file system, while factory firmwares typically only mount USB drives and even then, they may only support FAT and NTFS rather than Unix file systems.
 * The ability to move the root file system to external media (extroot) or create an overlay on it.
 * The presence of the `opkg` package manager and a software repository.
 * Flow offloading is predictably, standardly, and selectively manageable, as well as disableable.
