@@ -3535,10 +3535,10 @@ function multisplit(ctx, desync)
 - arg: nodrop - do not issue a VERDICT_DROP.
 - default payload filter - "known"
 
-Multisplit implements sequential segmentation of the current dissect or [reassembly](#multi-packet-payload-reception-features) with splits at positions defined by the [marker](#markers) list. It optionally supports replacing a data block with an arbitrary [blob](#passing-blobs) and the seqovl technique.
+Multisplit implements sequential segmentation of the current dissect or [reassembly](#handling-multi-packet-payloads) with splits at positions defined by the [marker](#markers) list. It optionally supports replacing a data block with an arbitrary [blob](#passing-blobs) and the seqovl technique.
 A VERDICT_DROP is issued after all segments are successfully sent, unless "nodrop" is specified.
 
-If [replaying](#multi-packet-payload-reception-features) delayed packets and [reassembly](#multi-packet-payload-reception-features) is present, desync.reasm_data is used instead of desync.dis.payload. Splitting occurs only during the replay of the first part of the [reassembly](#multi-packet-payload-reception-features); for the remaining parts, a VERDICT_DROP is issued if the transmission was successful and "nodrop" is not specified. Since the entire [reassembly](#multi-packet-payload-reception-features) has already been sent in segments, there is no need to re-send its original parts.
+If [replaying](#handling-multi-packet-payloads) delayed packets and [reassembly](#handling-multi-packet-payloads) is present, desync.reasm_data is used instead of desync.dis.payload. Splitting occurs only during the replay of the first part of the [reassembly](#handling-multi-packet-payloads); for the remaining parts, a VERDICT_DROP is issued if the transmission was successful and "nodrop" is not specified. Since the entire [reassembly](#handling-multi-packet-payloads) has already been sent in segments, there is no need to re-send its original parts.
 
 It can be used to send arbitrary data, including fakes, by replacing the current payload with an arbitrary blob.
 
