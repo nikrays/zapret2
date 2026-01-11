@@ -612,10 +612,11 @@ General parameters for all versions - nfqws2, dvtws2, winws2.
  --pidfile=<filename>                                   ; write PID to a file
  --ctrack-timeouts=S:E:F[:U]                            ; conntrack timeouts for tcp stages (SYN, ESTABLISHED, FIN) and for udp
  --ctrack-disable=[0|1]                                 ; 1 disables conntrack
+ --payload-disable=[type[,type]]                        ; do not discover these payload types. for available payload types see '--payload'. disable all if no argument.
  --server=[0|1]                                         ; server mode. modifies various aspects of direction selection and source/destination ip/port for handling listeners
  --ipcache-lifetime=<int>                               ; IP cache entry lifetime in seconds. 0 - unlimited.
  --ipcache-hostname=[0|1]                               ; 1 or no argument enables hostname caching for use in zero-phase strategies
- --reasm-disable=[proto[,proto]]                        ; disable fragment reassembly for a list of payloads: tls_client_hello quic_initial. without arguments - disable reasm for everything.
+ --reasm-disable=[type[,type]]                          ; disable fragment reassembly for a list of payloads: tls_client_hello quic_initial. without arguments - disable reasm for everything.
 
 DESYNC ENGINE INIT:
  --writeable[=<dir_name>]                               ; create a directory for Lua with write permissions and store its path in the "WRITEABLE" env variable (only one directory)

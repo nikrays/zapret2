@@ -1378,10 +1378,11 @@ static void exithelp(void)
 #endif
 		" --ctrack-timeouts=S:E:F[:U]\t\t\t\t; internal conntrack timeouts for TCP SYN, ESTABLISHED, FIN stages, UDP timeout. default %u:%u:%u:%u\n"
 		" --ctrack-disable=[0|1]\t\t\t\t\t; 1 or no argument disables conntrack\n"
+		" --payload-disable=[type[,type]]\t\t\t; do not discover these payload types. for available payload types see '--payload'. disable all if no argument.\n"
 		" --server=[0|1]\t\t\t\t\t\t; change multiple aspects of src/dst ip/port handling for incoming connections\n"
 		" --ipcache-lifetime=<int>\t\t\t\t; time in seconds to keep cached hop count and domain name (default %u). 0 = no expiration\n"
 		" --ipcache-hostname=[0|1]\t\t\t\t; 1 or no argument enables ip->hostname caching\n"
-		" --reasm-disable=[proto[,proto]]\t\t\t; disable reasm for these L7 payloads : tls_client_hello quic_initial . if no argument - disable all reasm.\n"
+		" --reasm-disable=[type[,type]]\t\t\t\t; disable reasm for these L7 payloads : tls_client_hello quic_initial . if no argument - disable all reasm.\n"
 #ifdef __CYGWIN__
 		"\nWINDIVERT FILTER:\n"
 		" --wf-iface=<int>[.<int>]\t\t\t\t; numeric network interface and subinterface indexes\n"
@@ -1523,6 +1524,7 @@ enum opt_indices {
 #endif
 	IDX_CTRACK_TIMEOUTS,
 	IDX_CTRACK_DISABLE,
+	IDX_PAYLOAD_DISABLE,
 	IDX_SERVER,
 	IDX_IPCACHE_LIFETIME,
 	IDX_IPCACHE_HOSTNAME,
@@ -1616,6 +1618,7 @@ static const struct option long_options[] = {
 #endif
 	[IDX_CTRACK_TIMEOUTS] = {"ctrack-timeouts", required_argument, 0, 0},
 	[IDX_CTRACK_DISABLE] = {"ctrack-disable", optional_argument, 0, 0},
+	[IDX_PAYLOAD_DISABLE] = {"payload-disable", optional_argument, 0, 0},
 	[IDX_SERVER] = {"server", optional_argument, 0, 0},
 	[IDX_IPCACHE_LIFETIME] = {"ipcache-lifetime", required_argument, 0, 0},
 	[IDX_IPCACHE_HOSTNAME] = {"ipcache-hostname", optional_argument, 0, 0},
@@ -1945,6 +1948,18 @@ int main(int argc, char **argv)
 		case IDX_IPCACHE_HOSTNAME:
 			params.cache_hostname = !optarg || atoi(optarg);
 			break;
+		case IDX_PAYLOAD_DISABLE:
+			if (optarg)
+			{
+				if (!parse_l7p_list(optarg, &params.payload_disable))
+				{
+					DLOG_ERR("Invalid payload filter : %s\n", optarg);
+					exit_clean(1);
+				}
+			}
+			else
+				params.payload_disable = L7P_ALL;
+			break;
 		case IDX_REASM_DISABLE:
 			if (optarg)
 			{
@@ -1955,7 +1970,7 @@ int main(int argc, char **argv)
 				}
 			}
 			else
-				params.reasm_payload_disable = 0xFFFFFFFFFFFFFFFF;
+				params.reasm_payload_disable = L7P_ALL;
 			break;
 #if defined(__linux__)
 		case IDX_FWMARK:

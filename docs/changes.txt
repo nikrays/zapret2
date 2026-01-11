@@ -176,3 +176,4 @@ v0.8.1
 * zapret-lib, zapret-antidpi: use numeric indexes in http dissects
 * nfqws2: move ctx from lightuserdata to userdata. prevents crashes on specific ARM cpus
 * nfqws2: alternative representation of payload filter in execution_plan item
+* nfqws2: --payload-disable

@@ -668,10 +668,11 @@ nfqws2 использует стандартный парсер getopt_long_only
  --pidfile=<filename>                                   ; запись PID в файл
  --ctrack-timeouts=S:E:F[:U]                            ; таймауты conntrack для стадий tcp SYN, ESTABLISHED, FIN и для udp
  --ctrack-disable=[0|1]                                 ; 1 отключает conntrack
+ --payload-disable=[type[,type]]                        ; отключить распознавание указанных типов пейлоадов. без аргумента - отключить все.
  --server=[0|1]                                         ; серверный режим. для обслуживания listener-ов меняются многие аспекты выбора направления и ip/port источника/приемника
  --ipcache-lifetime=<int>                               ; время жизни записей кэша IP в секундах. 0 - без ограничений.
  --ipcache-hostname=[0|1]                               ; 1 или отсутствие аргумента включают кэширование имен хостов для применения в стратегиях нулевой фазы
- --reasm-disable=[proto[,proto]]                        ; отключить сборку фрагментов для списка пейлоадов : tls_client_hello quic_initial . без аргумента - отключить reasm для всего.
+ --reasm-disable=[type[,type]]                          ; отключить сборку фрагментов для списка пейлоадов : tls_client_hello quic_initial . без аргумента - отключить reasm для всего.
 
 DESYNC ENGINE INIT:
  --writeable[=<dir_name>]                               ; создать директорию для Lua с разрешением записи и поместить путь к ней в переменную env "WRITEABLE" (только одна директория)

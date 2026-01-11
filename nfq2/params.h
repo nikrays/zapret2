@@ -21,8 +21,6 @@
 #include <wordexp.h>
 #endif
 
-#define TLS_PARTIALS_ENABLE	true
-
 #define RAW_SNDBUF	(64*1024)	// in bytes
 
 #define Q_MAXLEN	1024		// in packets
@@ -176,6 +174,7 @@ struct params_s
 	unsigned int ipcache_lifetime;
 	ip_cache ipcache;
 	uint64_t reasm_payload_disable;
+	uint64_t payload_disable;
 
 	struct str_list_head lua_init_scripts;
 	bool writeable_dir_enable;

@@ -30,7 +30,7 @@ static void protocol_probe(t_protocol_probe *probe, int probe_count, const uint8
 {
 	for (int i = 0; i < probe_count; i++)
 	{
-		if ((!probe[i].l7match || *l7proto==probe[i].l7) && probe[i].check(data_payload, len_payload))
+		if (!l7_payload_match(probe[i].l7p, params.payload_disable) && (!probe[i].l7match || *l7proto==probe[i].l7) && probe[i].check(data_payload, len_payload))
 		{
 			*l7payload = probe[i].l7p;
 			if (*l7proto == L7_UNKNOWN)
@@ -1280,88 +1280,78 @@ static uint8_t dpi_desync_tcp_packet_play(
 
 		process_retrans_fail(ctrack, dis, (struct sockaddr*)&src, ifin);
 
-		if (IsHttp(rdata_payload, rlen_payload))
+		t_protocol_probe testers[] = {
+			{L7P_TLS_CLIENT_HELLO,L7_TLS,IsTLSClientHelloPartial},
+			{L7P_HTTP_REQ,L7_HTTP,IsHttp,false},
+			{L7P_XMPP_STREAM,L7_XMPP,IsXMPPStream,false},
+			{L7P_XMPP_STARTTLS,L7_XMPP,IsXMPPStartTLS,false}
+		};
+		protocol_probe(testers, sizeof(testers) / sizeof(*testers), dis->data_payload, dis->len_payload, ctrack, &l7proto, &l7payload);
+
+		if (l7payload==L7P_UNKNOWN)
 		{
-			DLOG("packet contains HTTP request\n");
-			l7payload = L7P_HTTP_REQ;
-			if (l7proto == L7_UNKNOWN)
+			// this is special type. detection requires AES and can be successful only for the first data packet. no reason to AES every packet
+			if (ctrack && (ctrack->pos.client.seq_last - ctrack->pos.client.seq0)==1)
 			{
-				l7proto = L7_HTTP;
-				if (ctrack && ctrack->l7proto == L7_UNKNOWN) ctrack->l7proto = l7proto;
-			}
-
-			// we do not reassemble http
-			reasm_client_cancel(ctrack);
-
-			bHaveHost = HttpExtractHost(rdata_payload, rlen_payload, host, sizeof(host));
-			if (!bHaveHost)
-			{
-				DLOG("not applying tampering to HTTP without Host:\n");
-				goto pass;
+				t_protocol_probe testers[] = {
+					{L7P_MTPROTO_INITIAL,L7_MTPROTO,IsMTProto}
+				};
+				protocol_probe(testers, sizeof(testers) / sizeof(*testers), dis->data_payload, dis->len_payload, ctrack, &l7proto, &l7payload);
 			}
 		}
-		else if (IsTLSClientHello(rdata_payload, rlen_payload, TLS_PARTIALS_ENABLE))
+
+		switch(l7payload)
 		{
-			bool bReqFull = IsTLSRecordFull(rdata_payload, rlen_payload);
-			DLOG(bReqFull ? "packet contains full TLS ClientHello\n" : "packet contains partial TLS ClientHello\n");
-			l7payload = L7P_TLS_CLIENT_HELLO;
-			if (l7proto == L7_UNKNOWN)
-			{
-				l7proto = L7_TLS;
-				if (ctrack && ctrack->l7proto == L7_UNKNOWN) ctrack->l7proto = l7proto;
-			}
+			case L7P_HTTP_REQ:
+				// we do not reassemble http
+				reasm_client_cancel(ctrack);
 
-			if (bReqFull) TLSDebug(rdata_payload, rlen_payload);
-
-			bHaveHost = TLSHelloExtractHost(rdata_payload, rlen_payload, host, sizeof(host), TLS_PARTIALS_ENABLE);
-			if (ctrack && !(params.reasm_payload_disable && l7_payload_match(l7payload, params.reasm_payload_disable)))
-			{
-				// do not reasm retransmissions
-				if (!bReqFull && ReasmIsEmpty(&ctrack->reasm_client) && !is_retransmission(&ctrack->pos.client))
+				bHaveHost = HttpExtractHost(rdata_payload, rlen_payload, host, sizeof(host));
+				if (!bHaveHost)
 				{
-					// do not reconstruct unexpected large payload (they are feeding garbage ?)
-					if (!reasm_client_start(ctrack, IPPROTO_TCP, TLSRecordLen(dis->data_payload), TCP_MAX_REASM, dis->data_payload, dis->len_payload))
-						goto pass_reasm_cancel;
+					DLOG("not applying tampering to HTTP without Host:\n");
+					goto pass;
 				}
-
-				if (!ReasmIsEmpty(&ctrack->reasm_client))
+				break;
+			case L7P_TLS_CLIENT_HELLO:
 				{
-					if (rawpacket_queue_csum_fix(&ctrack->delayed, dis, &ctrack->pos, &dst, fwmark, desync_fwmark, ifin, ifout))
+				bool bReqFull = IsTLSRecordFull(rdata_payload, rlen_payload);
+				DLOG(bReqFull ? "TLS ClientHello is FULL\n" : "TLS ClientHello is PARTIAL\n");
+
+				if (bReqFull) TLSDebug(rdata_payload, rlen_payload);
+
+				bHaveHost = TLSHelloExtractHost(rdata_payload, rlen_payload, host, sizeof(host), true);
+				if (ctrack && !l7_payload_match(l7payload, params.reasm_payload_disable))
+				{
+					// do not reasm retransmissions
+					if (!bReqFull && ReasmIsEmpty(&ctrack->reasm_client) && !is_retransmission(&ctrack->pos.client))
 					{
-						DLOG("DELAY desync until reasm is complete (#%u)\n", rawpacket_queue_count(&ctrack->delayed));
+						// do not reconstruct unexpected large payload (they are feeding garbage ?)
+						if (!reasm_client_start(ctrack, IPPROTO_TCP, TLSRecordLen(dis->data_payload), TCP_MAX_REASM, dis->data_payload, dis->len_payload))
+							goto pass_reasm_cancel;
 					}
-					else
+
+					if (!ReasmIsEmpty(&ctrack->reasm_client))
 					{
-						DLOG_ERR("rawpacket_queue failed !\n");
-						goto pass_reasm_cancel;
+						if (rawpacket_queue_csum_fix(&ctrack->delayed, dis, &ctrack->pos, &dst, fwmark, desync_fwmark, ifin, ifout))
+						{
+							DLOG("DELAY desync until reasm is complete (#%u)\n", rawpacket_queue_count(&ctrack->delayed));
+						}
+						else
+						{
+							DLOG_ERR("rawpacket_queue failed !\n");
+							goto pass_reasm_cancel;
+						}
+						if (ReasmIsFull(&ctrack->reasm_client))
+						{
+							replay_queue(&ctrack->delayed);
+							reasm_client_fin(ctrack);
+						}
+						return VERDICT_DROP;
 					}
-					if (ReasmIsFull(&ctrack->reasm_client))
-					{
-						replay_queue(&ctrack->delayed);
-						reasm_client_fin(ctrack);
-					}
-					return VERDICT_DROP;
 				}
-			}
-		}
-		else if (ctrack && (ctrack->pos.client.seq_last - ctrack->pos.client.seq0)==1 && IsMTProto(dis->data_payload, dis->len_payload))
-		{
-			DLOG("packet contains telegram mtproto2 initial\n");
-			// mtproto detection requires aes. react only on the first tcp data packet. do not detect if ctrack unavailable.
-			l7payload = L7P_MTPROTO_INITIAL;
-			if (l7proto == L7_UNKNOWN)
-			{
-				l7proto = L7_MTPROTO;
-				if (ctrack->l7proto == L7_UNKNOWN) ctrack->l7proto = l7proto;
-			}
-		}
-		else
-		{
-			t_protocol_probe testers[] = {
-				{L7P_XMPP_STREAM,L7_XMPP,IsXMPPStream,false},
-				{L7P_XMPP_STARTTLS,L7_XMPP,IsXMPPStartTLS,false}
-			};
-			protocol_probe(testers, sizeof(testers) / sizeof(*testers), dis->data_payload, dis->len_payload, ctrack, &l7proto, &l7payload);
+				break;
+				}
 		}
 
 	}
@@ -1764,7 +1754,7 @@ static uint8_t dpi_desync_udp_packet_play(
 				}
 				if (pclean)
 				{
-					bool reasm_disable = params.reasm_payload_disable && l7_payload_match(l7payload, params.reasm_payload_disable);
+					bool reasm_disable = l7_payload_match(l7payload, params.reasm_payload_disable);
 					if (ctrack && !reasm_disable && !ReasmIsEmpty(&ctrack->reasm_client))
 					{
 						if (ReasmHasSpace(&ctrack->reasm_client, clean_len))
@@ -1826,7 +1816,7 @@ static uint8_t dpi_desync_udp_packet_play(
 							{
 								data_decrypt = defrag + hello_offset;
 								len_decrypt = hello_len;
-								bHaveHost = TLSHelloExtractHostFromHandshake(data_decrypt, len_decrypt, host, sizeof(host), TLS_PARTIALS_ENABLE);
+								bHaveHost = TLSHelloExtractHostFromHandshake(data_decrypt, len_decrypt, host, sizeof(host), true);
 							}
 							else
 							{

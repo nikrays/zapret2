@@ -532,6 +532,8 @@ void init_params(struct params_s *params)
 	LIST_INIT(&params->blobs);
 	LIST_INIT(&params->lua_init_scripts);
 
+	params->reasm_payload_disable = params->payload_disable = 1<<L7P_NONE;
+
 #ifdef __CYGWIN__
 	LIST_INIT(&params->ssid_filter);
 	LIST_INIT(&params->nlm_filter);
