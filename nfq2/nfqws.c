@@ -156,13 +156,14 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	uint8_t *data;
 	uint32_t ifidx_out, ifidx_in;
 	char ifout[IFNAMSIZ], ifin[IFNAMSIZ];
-	uint8_t mod[RECONSTRUCT_MAX_SIZE];
 	size_t modlen;
+	uint32_t mark;
+	uint8_t mod[RECONSTRUCT_MAX_SIZE];
 
 	ph = nfq_get_msg_packet_hdr(nfa);
 	id = ph ? ntohl(ph->packet_id) : 0;
 
-	uint32_t mark = nfq_get_nfmark(nfa);
+	mark = nfq_get_nfmark(nfa);
 	ilen = nfq_get_payload(nfa, &data);
 
 	ifidx_out = nfq_get_outdev(nfa);
@@ -282,12 +283,12 @@ static void notify_ready(void)
 
 static int nfq_main(void)
 {
-	uint8_t buf[RECONSTRUCT_MAX_SIZE] __attribute__((aligned));
 	struct nfq_handle *h = NULL;
 	struct nfq_q_handle *qh = NULL;
 	int res, fd, e;
 	ssize_t rd;
 	FILE *Fpid = NULL;
+	uint8_t buf[RECONSTRUCT_MAX_SIZE] __attribute__((aligned));
 
 	if (*params.pidfile && !(Fpid = fopen(params.pidfile, "w")))
 	{
@@ -389,7 +390,6 @@ err:
 
 static int dvt_main(void)
 {
-	uint8_t buf[RECONSTRUCT_MAX_SIZE] __attribute__((aligned));
 	struct sockaddr_storage sa_from;
 	int fd[2] = { -1,-1 }; // 4,6
 	int i, r, res = 1, fdct = 1, fdmax;
@@ -398,6 +398,9 @@ static int dvt_main(void)
 	ssize_t rd, wr;
 	fd_set fdset;
 	FILE *Fpid = NULL;
+	struct sockaddr_in bp4;
+	struct sockaddr_in6 bp6;
+	uint8_t buf[RECONSTRUCT_MAX_SIZE] __attribute__((aligned));
 
 	if (*params.pidfile && !(Fpid = fopen(params.pidfile, "w")))
 	{
@@ -405,49 +408,42 @@ static int dvt_main(void)
 		return 1;
 	}
 
+	bp4.sin_family = AF_INET;
+	bp4.sin_port = htons(params.port);
+	bp4.sin_addr.s_addr = INADDR_ANY;
+	DLOG_CONDUP("creating divert4 socket\n");
+	fd[0] = socket_divert(AF_INET);
+	if (fd[0] == -1) {
+		DLOG_PERROR("socket (DIVERT4)");
+		goto exiterr;
+	}
+	DLOG_CONDUP("binding divert4 socket\n");
+	if (bind(fd[0], (struct sockaddr*)&bp4, sizeof(bp4)) < 0)
 	{
-		struct sockaddr_in bp4;
-		bp4.sin_family = AF_INET;
-		bp4.sin_port = htons(params.port);
-		bp4.sin_addr.s_addr = INADDR_ANY;
-
-		DLOG_CONDUP("creating divert4 socket\n");
-		fd[0] = socket_divert(AF_INET);
-		if (fd[0] == -1) {
-			DLOG_PERROR("socket (DIVERT4)");
-			goto exiterr;
-		}
-		DLOG_CONDUP("binding divert4 socket\n");
-		if (bind(fd[0], (struct sockaddr*)&bp4, sizeof(bp4)) < 0)
-		{
-			DLOG_PERROR("bind (DIVERT4)");
-			goto exiterr;
-		}
+		DLOG_PERROR("bind (DIVERT4)");
+		goto exiterr;
 	}
 
 
 #ifdef __OpenBSD__
-	{
-		// in OpenBSD must use separate divert sockets for ipv4 and ipv6
-		struct sockaddr_in6 bp6;
-		memset(&bp6, 0, sizeof(bp6));
-		bp6.sin6_family = AF_INET6;
-		bp6.sin6_port = htons(params.port);
+	// in OpenBSD must use separate divert sockets for ipv4 and ipv6
+	memset(&bp6, 0, sizeof(bp6));
+	bp6.sin6_family = AF_INET6;
+	bp6.sin6_port = htons(params.port);
 
-		DLOG_CONDUP("creating divert6 socket\n");
-		fd[1] = socket_divert(AF_INET6);
-		if (fd[1] == -1) {
-			DLOG_PERROR("socket (DIVERT6)");
-			goto exiterr;
-		}
-		DLOG_CONDUP("binding divert6 socket\n");
-		if (bind(fd[1], (struct sockaddr*)&bp6, sizeof(bp6)) < 0)
-		{
-			DLOG_PERROR("bind (DIVERT6)");
-			goto exiterr;
-		}
-		fdct++;
+	DLOG_CONDUP("creating divert6 socket\n");
+	fd[1] = socket_divert(AF_INET6);
+	if (fd[1] == -1) {
+		DLOG_PERROR("socket (DIVERT6)");
+		goto exiterr;
 	}
+	DLOG_CONDUP("binding divert6 socket\n");
+	if (bind(fd[1], (struct sockaddr*)&bp6, sizeof(bp6)) < 0)
+	{
+		DLOG_PERROR("bind (DIVERT6)");
+		goto exiterr;
+	}
+	fdct++;
 #endif
 	fdmax = (fd[0] > fd[1] ? fd[0] : fd[1]) + 1;
 
@@ -590,11 +586,11 @@ static int win_main()
 	unsigned int id;
 	uint8_t verdict;
 	bool bOutbound;
-	uint8_t packet[RECONSTRUCT_MAX_SIZE];
 	uint32_t mark;
 	WINDIVERT_ADDRESS wa;
 	char ifname[IFNAMSIZ];
 	int res=0;
+	uint8_t packet[RECONSTRUCT_MAX_SIZE];
 
 	if (params.daemon) daemonize();
 
@@ -1340,7 +1336,7 @@ static void exithelp(void)
 	*all_payloads=0;
 	for (t_l7payload pl=0 ; pl<L7P_LAST; pl++)
 	{
-		if (pl) strncat(all_payloads, " ", sizeof(all_payloads)-1-1);
+		if (pl) strncat(all_payloads, " ", sizeof(all_payloads)-strlen(all_payloads)-1);
 		strncat(all_payloads, l7payload_str(pl), sizeof(all_payloads)-strlen(all_payloads)-1);
 	}
 	*all_protos=0;
@@ -2640,7 +2636,8 @@ int main(int argc, char **argv)
 	HANDLE hMutexArg;
 	{
 		char mutex_name[128];
-		snprintf(mutex_name, sizeof(mutex_name), "Global\\winws2_arg_%u_%u_%u_%u_%u_%u_%u_%u_%u_%u", hash_wf_tcp_in, hash_wf_udp_in, hash_wf_tcp_out, hash_wf_udp_out, hash_wf_raw, hash_wf_raw_part, hash_ssid_filter, hash_nlm_filter, IfIdx, SubIfIdx, wf_ipv4, wf_ipv6);
+		snprintf(mutex_name, sizeof(mutex_name), "Global\\winws2_arg_%u_%u_%u_%u_%u_%u_%u_%u_%u_%u_%u_%u",
+			hash_wf_tcp_in, hash_wf_udp_in, hash_wf_tcp_out, hash_wf_udp_out, hash_wf_raw, hash_wf_raw_part, hash_ssid_filter, hash_nlm_filter, IfIdx, SubIfIdx, wf_ipv4, wf_ipv6);
 
 		hMutexArg = CreateMutexA(NULL, TRUE, mutex_name);
 		if (hMutexArg && GetLastError() == ERROR_ALREADY_EXISTS)

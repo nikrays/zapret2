@@ -4,7 +4,6 @@
 #include "helpers.h"
 
 
-// inplace tolower() and add to pool
 static bool addpool(ipset *ips, char **s, const char *end, int *ct)
 {
 	char *p, cidr[128];

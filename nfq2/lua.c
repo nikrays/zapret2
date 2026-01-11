@@ -2159,8 +2159,9 @@ static int luacall_reconstruct_dissect(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 
+	size_t l;
 	uint8_t buf[RECONSTRUCT_MAX_SIZE];
-	size_t l = sizeof(buf);
+	l = sizeof(buf);
 
 	bool ip6_preserve_next, badsum;
 	lua_reconstruct_extract_options(L, 2, &badsum, &ip6_preserve_next, NULL);
@@ -2412,13 +2413,14 @@ static int luacall_rawsend_dissect(lua_State *L)
 
 	LUA_STACK_GUARD_ENTER(L)
 
-	uint8_t buf[RECONSTRUCT_MAX_SIZE];
-	size_t len=sizeof(buf);
+	size_t len;
 	const char *ifout;
 	int repeats;
 	uint32_t fwmark;
 	sockaddr_in46 sa;
 	bool b, badsum, ip6_preserve_next;
+	uint8_t buf[RECONSTRUCT_MAX_SIZE];
+	len = sizeof(buf);
 
 	luaL_checktype(L,1,LUA_TTABLE);
 	lua_rawsend_extract_options(L,2, &repeats, &fwmark, &ifout);
@@ -3031,7 +3033,7 @@ static int luaL_doZfile(lua_State *L, const char *filename)
 		return r;
 	}
 	else
-		return luaL_dofile(L, filename);
+		return luaL_dofile(L, fname);
 }
 
 static bool lua_init_scripts(void)

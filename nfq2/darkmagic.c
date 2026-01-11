@@ -622,7 +622,7 @@ BOOL LowMandatoryLevel(void)
 
 	label_low.Label.Sid = (PSID)buf1;
 	InitializeSid(label_low.Label.Sid, &label_authority, 1);
-	label_low.Label.Attributes = 0;
+	label_low.Label.Attributes = SE_GROUP_INTEGRITY;
 	*GetSidSubAuthority(label_low.Label.Sid, 0) = SECURITY_MANDATORY_LOW_RID;
 
 	// S-1-16-12288 : Mandatory Label\High Mandatory Level
@@ -892,7 +892,7 @@ bool win_dark_init(const struct str_list_head *ssid_filter, const struct str_lis
 	wlan_filter_ssid = ssid_filter;
 	return true;
 }
-bool win_dark_deinit(void)
+void win_dark_deinit(void)
 {
 	if (pNetworkListManager)
 	{
@@ -997,11 +997,12 @@ bool nlm_list(bool bAll)
 		}
 		else
 			bRet = false;
+
+		CoUninitialize();
 	}
 	else
 		bRet = false;
 
-	CoUninitialize();
 	return bRet;
 }
 
@@ -1171,8 +1172,11 @@ static HANDLE windivert_init_filter(const char *filter, UINT64 flags)
 
 	FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
 		NULL, w_win32_error, MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT), (LPSTR)&errormessage, 0, NULL);
-	DLOG_ERR("windivert: error opening filter: %s", errormessage);
-	LocalFree(errormessage);
+	if (errormessage)
+	{
+		DLOG_ERR("windivert: error opening filter: %s", errormessage);
+		LocalFree(errormessage);
+	}
 	if (w_win32_error == ERROR_INVALID_IMAGE_HASH)
 		DLOG_ERR("windivert: try to disable secure boot and install OS patches\n");
 

@@ -79,7 +79,7 @@ bool AppendHostList(hostlist_pool **hostlist, const char *filename)
 		}
 		else
 		{
-			DLOG_ERR("zlib decompression failed : result %d\n",r);
+			DLOG_ERR("zlib decompression failed : result %d\n", r);
 			return false;
 		}
 	}

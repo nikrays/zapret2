@@ -45,7 +45,7 @@
 // this MSS is used for ipv6 in windows and linux
 #define DEFAULT_MSS			1220
 
-#define RECONSTRUCT_MAX_SIZE		16384
+#define RECONSTRUCT_MAX_SIZE		65536
 
 #define LUA_GC_INTERVAL			60
 

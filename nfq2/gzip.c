@@ -31,7 +31,12 @@ int z_readfile(FILE *F, char **buf, size_t *size, size_t extra_alloc)
 			r = Z_ERRNO;
 			goto zerr;
 		}
-		if (!zs.avail_in) break;
+		if (!zs.avail_in)
+		{
+			// file is not full
+			r = Z_DATA_ERROR;
+			goto zerr;
+		}
 		zs.next_in = in;
 		do
 		{

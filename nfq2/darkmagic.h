@@ -94,7 +94,7 @@ bool ensure_dir_access(const char *filename);
 bool prepare_low_appdata();
 bool win_sandbox(void);
 bool win_dark_init(const struct str_list_head *ssid_filter, const struct str_list_head *nlm_filter);
-bool win_dark_deinit(void);
+void win_dark_deinit(void);
 bool logical_net_filter_present(void);
 bool logical_net_filter_match(void);
 bool nlm_list(bool bAll);

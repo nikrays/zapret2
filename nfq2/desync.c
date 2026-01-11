@@ -1117,7 +1117,7 @@ static uint8_t dpi_desync_tcp_packet_play(
 			}
 		}
 		// in absence of conntrack guess direction by presence of interface names. won't work on BSD
-		bReverseFixed = ctrack ? (bReverse ^ params.server) : (bReverse = ifin && ifin && (!ifout || !*ifout));
+		bReverseFixed = ctrack ? (bReverse ^ params.server) : (bReverse = ifin && *ifin && (!ifout || !*ifout));
 		setup_direction(dis, bReverseFixed, &src, &dst, &sdip4, &sdip6, &sdport);
 		ifname = bReverse ? ifin : ifout;
 #ifdef HAS_FILTER_SSID
@@ -1663,7 +1663,7 @@ static uint8_t dpi_desync_udp_packet_play(
 			}
 		}
 		// in absence of conntrack guess direction by presence of interface names. won't work on BSD
-		bReverseFixed = ctrack ? (bReverse ^ params.server) : (bReverse = ifin && ifin && (!ifout || !*ifout));
+		bReverseFixed = ctrack ? (bReverse ^ params.server) : (bReverse = ifin && *ifin && (!ifout || !*ifout));
 		setup_direction(dis, bReverseFixed, &src, &dst, &sdip4, &sdip6, &sdport);
 
 		ifname = bReverse ? ifin : ifout;
