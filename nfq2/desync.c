@@ -781,19 +781,24 @@ static uint8_t desync(
 
 	if (LIST_FIRST(&dp->lua_desync))
 	{
-		params.desync_ctx->dp = dp;
-		params.desync_ctx->ctrack = ctrack;
-		params.desync_ctx->dis = dis;
-		params.desync_ctx->cancel = false;
-		params.desync_ctx->incoming = bIncoming;
+		lua_rawgeti(params.L, LUA_REGISTRYINDEX, params.ref_desync_ctx);
+		t_lua_desync_context *ctx = (t_lua_desync_context *)luaL_checkudata(params.L, 1, "desync_ctx");
+		// this is singleton stored in the registry. safe to pop
+		lua_pop(params.L,1);
+
+		ctx->dp = dp;
+		ctx->ctrack = ctrack;
+		ctx->dis = dis;
+		ctx->cancel = false;
+		ctx->incoming = bIncoming;
 
 		b_cutoff_all = b_unwanted_payload = true;
-		params.desync_ctx->func_n = 1;
+		ctx->func_n = 1;
 		LIST_FOREACH(func, &dp->lua_desync, next)
 		{
-			params.desync_ctx->func = func->func;
-			desync_instance(func->func, dp->n, params.desync_ctx->func_n, instance, sizeof(instance));
-			params.desync_ctx->instance = instance;
+			ctx->func = func->func;
+			desync_instance(func->func, dp->n, ctx->func_n, instance, sizeof(instance));
+			ctx->instance = instance;
 			range = bIncoming ? &func->range_in : &func->range_out;
 
 			if (b_unwanted_payload)
@@ -801,7 +806,7 @@ static uint8_t desync(
 
 			if (b_cutoff_all)
 			{
-				if (lua_instance_cutoff_check(params.L, params.desync_ctx, bIncoming))
+				if (lua_instance_cutoff_check(params.L, ctx, bIncoming))
 					DLOG("* lua '%s' : voluntary cutoff\n", instance);
 				else if (check_pos_cutoff(pos, range))
 				{
@@ -819,7 +824,7 @@ static uint8_t desync(
 				else
 					b_cutoff_all = false;
 			}
-			params.desync_ctx->func_n++;
+			ctx->func_n++;
 		}
 		if (b_cutoff_all)
 		{
@@ -872,14 +877,14 @@ static uint8_t desync(
 			}
 			ref_arg = luaL_ref(params.L, LUA_REGISTRYINDEX);
 
-			params.desync_ctx->func_n = 1;
+			ctx->func_n = 1;
 			LIST_FOREACH(func, &dp->lua_desync, next)
 			{
-				params.desync_ctx->func = func->func;
-				desync_instance(func->func, dp->n, params.desync_ctx->func_n, instance, sizeof(instance));
-				params.desync_ctx->instance = instance;
+				ctx->func = func->func;
+				desync_instance(func->func, dp->n, ctx->func_n, instance, sizeof(instance));
+				ctx->instance = instance;
 
-				if (!lua_instance_cutoff_check(params.L, params.desync_ctx, bIncoming))
+				if (!lua_instance_cutoff_check(params.L, ctx, bIncoming))
 				{
 					range = bIncoming ? &func->range_in : &func->range_out;
 					if (check_pos_range(pos, range))
@@ -906,12 +911,12 @@ static uint8_t desync(
 							lua_rawgeti(params.L, LUA_REGISTRYINDEX, ref_arg);
 							lua_pushf_args(params.L, &func->args, -1, true);
 							lua_pushf_str(params.L, "func", func->func);
-							lua_pushf_int(params.L, "func_n", params.desync_ctx->func_n);
+							lua_pushf_int(params.L, "func_n", ctx->func_n);
 							lua_pushf_str(params.L, "func_instance", instance);
 							// prevent use of desync ctx object outside of function call
-							params.desync_ctx->valid = true;
+							ctx->valid = true;
 							status = lua_pcall(params.L, 2, LUA_MULTRET, 0);
-							params.desync_ctx->valid = false;
+							ctx->valid = false;
 
 							if (status)
 							{
@@ -941,8 +946,8 @@ static uint8_t desync(
 							range->upper_cutoff ? '<' : '-',
 							range->to.mode, range->to.pos);
 				}
-				if (params.desync_ctx->cancel) break;
-				params.desync_ctx->func_n++;
+				if (ctx->cancel) break;
+				ctx->func_n++;
 			}
 		}
 

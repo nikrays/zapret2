@@ -787,8 +787,8 @@ static void lua_desync_ctx_create(lua_State *L)
 	{
 		LUA_STACK_GUARD_ENTER(L)
 
-		params.desync_ctx = (t_lua_desync_context *)lua_newuserdata(L, sizeof(t_lua_desync_context));
-		memset(params.desync_ctx, 0, sizeof(t_lua_desync_context));
+		t_lua_desync_context *ctx = (t_lua_desync_context *)lua_newuserdata(L, sizeof(t_lua_desync_context));
+		memset(ctx, 0, sizeof(*ctx));
 		luaL_getmetatable(L, "desync_ctx");
 		lua_setmetatable(L, -2);
 		params.ref_desync_ctx = luaL_ref(params.L, LUA_REGISTRYINDEX);
@@ -802,7 +802,6 @@ static void lua_desync_ctx_destroy(lua_State *L)
 	{
 		luaL_unref(L, LUA_REGISTRYINDEX, params.ref_desync_ctx);
 		params.ref_desync_ctx = 0;
-		params.desync_ctx = NULL;
 	}
 }
 

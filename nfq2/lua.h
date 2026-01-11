@@ -14,7 +14,6 @@
 #include "pools.h"
 #include "conntrack.h"
 #include "darkmagic.h"
-#include "params.h"
 
 #if LUA_VERSION_NUM < 503
 #define lua_isinteger lua_isnumber
@@ -101,5 +100,15 @@ bool lua_reconstruct_iphdr(lua_State *L, int idx, struct ip *ip, size_t *len);
 bool lua_reconstruct_tcphdr(lua_State *L, int idx, struct tcphdr *tcp, size_t *len);
 bool lua_reconstruct_udphdr(lua_State *L, int idx, struct udphdr *udp);
 bool lua_reconstruct_dissect(lua_State *L, int idx, uint8_t *buf, size_t *len, bool badsum, bool ip6_preserve_next);
+
+typedef struct {
+	unsigned int func_n;
+	const char *func, *instance;
+	const struct desync_profile *dp;
+	const struct dissect *dis;
+	t_ctrack *ctrack;
+	bool incoming, cancel;
+	bool valid;
+} t_lua_desync_context;
 
 bool lua_instance_cutoff_check(lua_State *L, const t_lua_desync_context *ctx, bool bIn);

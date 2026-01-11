@@ -499,8 +499,6 @@ void cleanup_params(struct params_s *params)
 	blob_collection_destroy(&params->blobs);
 	strlist_destroy(&params->lua_init_scripts);
 
-	params->desync_ctx = NULL;
-
 #ifdef __CYGWIN__
 	strlist_destroy(&params->ssid_filter);
 	strlist_destroy(&params->nlm_filter);
