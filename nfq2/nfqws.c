@@ -56,6 +56,8 @@ bool bQuit = false;
 
 static void onhup(int sig)
 {
+	if (bQuit) return;
+
 	const char *msg = "HUP received ! Lists will be reloaded.\n";
 	size_t wr = write(1, msg, strlen(msg));
 	bReload = true;
@@ -82,12 +84,16 @@ static void ReloadCheck()
 
 static void onusr1(int sig)
 {
+	if (bQuit) return;
+
 	printf("\nCONNTRACK DUMP\n");
 	ConntrackPoolDump(&params.conntrack);
 	printf("\n");
 }
 static void onusr2(int sig)
 {
+	if (bQuit) return;
+
 	printf("\nHOSTFAIL POOL DUMP\n");
 
 	struct desync_profile_list *dpl;
@@ -102,12 +108,16 @@ static void onusr2(int sig)
 }
 static void onint(int sig)
 {
+	if (bQuit) return;
+
 	const char *msg = "INT received !\n";
 	size_t wr = write(1, msg, strlen(msg));
 	bQuit = true;
 }
 static void onterm(int sig)
 {
+	if (bQuit) return;
+
 	const char *msg = "TERM received !\n";
 	size_t wr = write(1, msg, strlen(msg));
 	bQuit = true;
