@@ -2027,6 +2027,7 @@ static uint8_t dpi_desync_packet_play(
 				verdict = dpi_desync_tcp_packet_play(replay_piece, replay_piece_count, reasm_offset, fwmark, ifin, ifout, tpos, &dis, mod_pkt, len_mod_pkt);
 				// fix csum if unmodified and if OS can pass wrong csum to queue (depends on OS)
 				// modified means we have already fixed the checksum or made it invalid intentionally
+				// this is the only point we VIOLATE const to fix the checksum in the original buffer to avoid copying to mod_pkt
 				verdict_tcp_csum_fix(verdict, (struct tcphdr *)dis.tcp, dis.transport_len, dis.ip, dis.ip6);
 			}
 			break;
@@ -2036,6 +2037,7 @@ static uint8_t dpi_desync_packet_play(
 				verdict = dpi_desync_udp_packet_play(replay_piece, replay_piece_count, reasm_offset, fwmark, ifin, ifout, tpos, &dis, mod_pkt, len_mod_pkt);
 				// fix csum if unmodified and if OS can pass wrong csum to queue (depends on OS)
 				// modified means we have already fixed the checksum or made it invalid intentionally
+				// this is the only point we VIOLATE const to fix the checksum in the original buffer to avoid copying to mod_pkt
 				verdict_udp_csum_fix(verdict, (struct udphdr *)dis.udp, dis.transport_len, dis.ip, dis.ip6);
 			}
 			break;
