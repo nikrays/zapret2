@@ -5329,7 +5329,7 @@ windivert 2.2.2-A, который идет в поставке zapret.
 
 1) Взять `windivert64.sys` и `windivert.dll` версии 2.2.0-C или 2.2.0-D [отсюда](https://reqrypt.org/download) и заменить эти 2 файла.
 
-2) Взломать ESU : [Ссылка1 1](https://hackandpwn.com/windows-7-esu-patching) [Ссылка2 2](http://www.bifido.net/tweaks-and-scripts/8-extended-security-updates-installer.html)
+2) Взломать ESU : [Ссылка 1](https://hackandpwn.com/windows-7-esu-patching) [Ссылка 2](http://www.bifido.net/tweaks-and-scripts/8-extended-security-updates-installer.html)
 
 3) Использовать готовый патчер-взламыватель ESU - "BypassESU". Его надо искать по названию.
 
