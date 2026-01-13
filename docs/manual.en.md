@@ -5107,7 +5107,7 @@ zapret was initially written for unix. It uses unix emulation layer cygwin on Wi
 
 If winws2 is run standalone cygwin1.dll is required in it's directory. If winws2 is run inside cygwin environment - cygwin1.dll must NOT be present in it's directory or it won't run.
 
-cygwin emulate shared PID namespaces and deliver signals only within one cygwin1.dll instance !
+cygwin emulate shared PID namespace and deliver signals only within one cygwin1.dll instance !
 To send singnals signal sending program (kill, killall) must be run with the same cygwin1.dll as winws2.
 
 It's possible to install cygwin and use winws2 inside cygwin installation.
