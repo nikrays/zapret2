@@ -242,9 +242,9 @@ end
 
 -- if seq is over 2G s and p position comparision can be wrong
 function pos_counter_overflow(desync, mode, reverse)
-	if not desync.track or not desync.track.tcp or (mode~='s' and mode~='p') then return false end
+	if not desync.track or (mode~='s' and mode~='p') then return false end
 	local track_pos = reverse and desync.track.pos.reverse or desync.track.pos.direct
-	return track_pos.tcp.rseq_over_2G
+	return track_pos.tcp and track_pos.tcp.rseq_over_2G
 end
 -- these functions duplicate range check logic from C code
 -- mode must be n,d,b,s,x,a
@@ -1115,7 +1115,7 @@ end
 -- check if desync.outgoing comply with arg.dir or def if it's not present or "out" of they are not present both. dir can be "in","out","any"
 function direction_check(desync, def)
 	local dir = desync.arg.dir or def or "out"
-	return desync.outgoing and desync.arg.dir~="in" or not desync.outgoing and dir~="out"
+	return desync.outgoing and dir~="in" or not desync.outgoing and dir~="out"
 end
 -- if dir "in" or "out" cutoff current desync function from opposite direction
 function direction_cutoff_opposite(ctx, desync, def)
@@ -1481,7 +1481,7 @@ function gzip_file(filename, data, expected_ratio, level, memlevel, compress_blo
 	if not f then
 		error("gzip_file: "..err)
 	end
-	if not write_block_size then compress_block_size=16384 end
+	if not compress_block_size then compress_block_size=16384 end
 	if not expected_ratio then expected_ratio=2 end
 
 	gz = gzip_init(nil, level, memlevel)

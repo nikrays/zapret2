@@ -950,7 +950,7 @@ static int luacall_execution_plan(lua_State *L)
 
 			lua_pushf_args(L,&func->args, -1, false);
 			lua_pushf_str(L,"func", func->func);
-			lua_pushf_int(L,"func_n", ctx->func_n);
+			lua_pushf_int(L,"func_n", n);
 			lua_pushf_str(L,"func_instance", instance);
 			lua_pushf_range(L,"range", range);
 
@@ -1449,7 +1449,7 @@ void lua_pushf_ctrack(lua_State *L, const t_ctrack *ctrack, const t_ctrack_posit
 		lua_pushf_reg(L, "lua_state", ctrack->lua_state);
 		lua_pushf_bool(L, "lua_in_cutoff", ctrack->b_lua_in_cutoff);
 		lua_pushf_bool(L, "lua_out_cutoff", ctrack->b_lua_out_cutoff);
-		lua_pushf_lint(L, "t_start", (lua_Number)ctrack->t_start.tv_sec + ctrack->t_start.tv_nsec/1000000000.);
+		lua_pushf_number(L, "t_start", (lua_Number)ctrack->t_start.tv_sec + ctrack->t_start.tv_nsec/1000000000.);
 
 		lua_pushliteral(L, "pos");
 		lua_createtable(L, 0, 5);
@@ -3260,7 +3260,7 @@ static void lua_init_const(void)
 		{"IPTOS_ECN_ECT1",IPTOS_ECN_ECT1},
 		{"IPTOS_ECN_ECT0",IPTOS_ECN_ECT0},
 		{"IPTOS_ECN_CE",IPTOS_ECN_CE},
-		{"IPTOS_DSCP_MASK",0xF0},
+		{"IPTOS_DSCP_MASK",0xFC},
 		{"IP6F_MORE_FRAG",0x0001}, // in ip6.h it's defined depending of machine byte order
 		{"IPV6_FLOWLABEL_MASK",0x000FFFFF},
 		{"IPV6_FLOWINFO_MASK",0x0FFFFFFF},
