@@ -90,8 +90,6 @@ ssize_t TLSPos(t_marker posmarker, int16_t pos, const uint8_t *data, size_t sz);
 ssize_t ResolvePos(const uint8_t *data, size_t sz, t_l7payload l7payload, const struct proto_pos *sp);
 void ResolveMultiPos(const uint8_t *data, size_t sz, t_l7payload l7payload, const struct proto_pos *marker, int marker_count, ssize_t *pos, int *pos_count);
 
-extern const char *http_methods[9];
-const char *HttpMethod(const uint8_t *data, size_t len);
 bool IsHttp(const uint8_t *data, size_t len);
 bool HttpFindHost(uint8_t **pHost,uint8_t *buf,size_t bs);
 // header must be passed like this : "\nHost:"

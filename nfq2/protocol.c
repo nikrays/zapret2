@@ -243,24 +243,38 @@ void ResolveMultiPos(const uint8_t *data, size_t sz, t_l7payload l7payload, cons
 }
 
 
-const char *http_methods[] = { "GET /","POST /","HEAD /","OPTIONS ","PUT /","DELETE /","CONNECT ","TRACE /",NULL };
-const char *HttpMethod(const uint8_t *data, size_t len)
+static const char *http_methods[] = { "GET ","POST ","HEAD ","OPTIONS ","PUT ","DELETE ","CONNECT ","TRACE ",NULL };
+static const char *HttpMethod(const uint8_t *data, size_t len)
 {
 	const char **method;
 	size_t method_len;
-	for (method = http_methods; *method; method++)
+
+	if (len>=4)
 	{
-		method_len = strlen(*method);
-		if (method_len <= len && !memcmp(data, *method, method_len))
-			return *method;
+		for (method = http_methods; *method; method++)
+		{
+			method_len = strlen(*method);
+			if (method_len <= len && !memcmp(data, *method, method_len))
+				return *method;
+		}
 	}
 	return NULL;
 }
 bool IsHttp(const uint8_t *data, size_t len)
 {
-	return !!HttpMethod(data,len);
+	if (!HttpMethod(data,len)) return false;
+	// GET /uri HTTP/1.1
+	// skip method
+	for(; len && *data!=' ' && *data!='\t' && *data!='\r' && *data!='\n'; data++, len--);
+	if (!len || *data!=' ' && *data!='\t') return false;
+	for(; len && (*data==' '|| *data=='\t'); data++, len--);
+	// skip URI
+	for(; len && *data!=' ' && *data!='\t' && *data!='\r' && *data!='\n'; data++, len--);
+	if (!len || *data!=' ' && *data!='\t') return false;
+	for(; len && (*data==' '|| *data=='\t'); data++, len--);
+	if (len<10 || *data=='\r' || *data=='\n')  return false;
+	return !memcmp(data,"HTTP/1.",7);
 }
-
 static bool IsHostAt(const uint8_t *p)
 {
 	return \
