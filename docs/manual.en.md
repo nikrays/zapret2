@@ -3825,13 +3825,14 @@ After it's done it executes [instance cutoff](#instance_cutoff).
 
 Target OS throws away OOB byte from the stream but DPI may analyze message with OOB byte as it's part thus breaking the message.
 
-- OOB is obsolete but still supported in most OS mechanism. There are two RFCs. The older one assumes that th_urp points to the OOB byte,
+- OOB is obsolete but still supported in most OS. There are two RFCs. The older one assumes that th_urp points to the OOB byte,
 the newer one to the next byte. Therefore, the value th_urp=0 is invalid according to the new standard, but it can still work.
 To enable it, specify "urp=b".
 - "urp=e" inserts an OOB byte after the very last byte of the payload - generally useless for DPI bypass, since DPI gets the entire original message.
 - Requires redirection of incoming traffic within `--in-range=-s1`
 - Cannot be filtered by payload because after the start it's not possible to stop and not to insert the byte. Inserting a byte without OOB breaks the data.
 - Hostlist filtering is only possible with `--ipcache-hostname`.
+- oob is "lasting" desync. If profile switch occurs before oob is finished it must be duplicated to that profile or TCP will break because of sequence desync.
 - Can't work with functions that resend modified payload. multisplit, multidisorder, fakedsplit, fakeddisorder, etc will send duplicates without OOB.
 - If the payload is [multi-segment](#handling-multi-packet-payloads), the entire [reasm](#handling-multi-packet-payloads) is sent. OOB is inserted into the segment where urp hits.
 In this segment the th_urp is normalized by segment offset, the TH_URG flag is set. The rest of the parts are sent as is. The function drops the whole replay then [cuts itself off](#instance_cutoff).
