@@ -177,7 +177,7 @@ static int luacall_bitget(lua_State *L)
 	if (from<0 || to<0 || from>to || from>47 || to>47)
 		luaL_error(L, "bit range invalid");
 
-	what = (what >> from) & ~((lua_Integer)-1 << (to-from+1));
+	what = (what >> from) & ~((uint64_t)-1 << (to-from+1));
 
 	lua_pushlint(L,what);
 	return 1;

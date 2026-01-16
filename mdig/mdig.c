@@ -80,15 +80,15 @@ static bool dom_valid(char *dom)
 {
 	if (!dom || *dom=='.') return false;
 	for (; *dom; dom++)
-	if (*dom < 0x20 || (*dom & 0x80) || !(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
-		return false;
+		if (!(*dom == '.' || *dom == '-' || *dom == '_' || (*dom >= '0' && *dom <= '9') || (*dom >= 'a' && *dom <= 'z') || (*dom >= 'A' && *dom <= 'Z')))
+			return false;
 	return true;
 }
 
 static void invalid_domain_beautify(char *dom)
 {
 	for (int i = 0; *dom && i < 64; i++, dom++)
-		if (*dom < 0x20 || *dom<0) *dom = '?';
+		if (*dom < 0x20 || (*dom & 0x80)) *dom = '?';
 	if (*dom) *dom = 0;
 }
 
@@ -436,7 +436,7 @@ int dns_parse_query()
 	_setmode(_fileno(stdin), _O_BINARY);
 #endif
 	l = fread(a,1,sizeof(a),stdin);
-	if (!l || !feof(stdin))
+	if (!l || ferror(stdin))
 	{
 		fprintf(stderr, "could not read DNS reply blob from stdin\n");
 		return 10;

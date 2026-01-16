@@ -606,7 +606,7 @@ void fill_random_bytes(uint8_t *p,size_t sz)
 void fill_random_az(uint8_t *p,size_t sz)
 {
 	size_t k;
-	for(k=0;k<sz;k++) p[k] = 'a'+(random() % ('z'-'a'));
+	for(k=0;k<sz;k++) p[k] = 'a'+(random() % ('z'-'a'+1));
 }
 void fill_random_az09(uint8_t *p,size_t sz)
 {

@@ -75,9 +75,9 @@ void funclist_destroy(struct func_list_head *head);
 
 
 typedef struct hostfail_pool {
-	char *str;		/* key */
-	int counter;	/* value */
-	time_t expire;	/* when to expire record (unixtime) */
+	char *str;
+	int counter;
+	time_t expire;	// when to expire record (unixtime)
 	UT_hash_handle hh;	/* makes this structure hashable */
 } hostfail_pool;
 
@@ -86,7 +86,7 @@ hostfail_pool *HostFailPoolAdd(hostfail_pool **pp,const char *s,int fail_time);
 hostfail_pool *HostFailPoolFind(hostfail_pool *p,const char *s);
 void HostFailPoolDel(hostfail_pool **pp, hostfail_pool *elem);
 void HostFailPoolPurge(hostfail_pool **pp);
-void HostFailPoolPurgeRateLimited(hostfail_pool **pp);
+void HostFailPoolPurgeRateLimited(hostfail_pool **pp, time_t *purge_prev);
 void HostFailPoolDump(hostfail_pool *p);
 
 

@@ -1154,7 +1154,7 @@ static uint8_t dpi_desync_tcp_packet_play(
 			return verdict;
 		}
 
-		HostFailPoolPurgeRateLimited(&dp->hostlist_auto_fail_counters);
+		HostFailPoolPurgeRateLimited(&dp->hostlist_auto_fail_counters, &dp->hostlist_auto_last_purge);
 
 		//ConntrackPoolDump(&params.conntrack);
 
@@ -1690,7 +1690,7 @@ static uint8_t dpi_desync_udp_packet_play(
 			return verdict;
 		}
 
-		HostFailPoolPurgeRateLimited(&dp->hostlist_auto_fail_counters);
+		HostFailPoolPurgeRateLimited(&dp->hostlist_auto_fail_counters, &dp->hostlist_auto_last_purge);
 		//ConntrackPoolDump(&params.conntrack);
 
 		if (bReverseFixed)

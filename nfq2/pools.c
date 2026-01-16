@@ -112,15 +112,14 @@ void HostFailPoolPurge(hostfail_pool **pp)
 			HostFailPoolDel(pp, elem);
 	}
 }
-static time_t host_fail_purge_prev=0;
-void HostFailPoolPurgeRateLimited(hostfail_pool **pp)
+void HostFailPoolPurgeRateLimited(hostfail_pool **pp, time_t *purge_prev)
 {
 	time_t now = time(NULL);
 	// do not purge too often to save resources
-	if (host_fail_purge_prev != now)
+	if (*purge_prev != now)
 	{
 		HostFailPoolPurge(pp);
-		host_fail_purge_prev = now;
+		*purge_prev = now;
 	}
 }
 void HostFailPoolDump(hostfail_pool *p)

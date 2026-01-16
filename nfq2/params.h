@@ -85,6 +85,7 @@ struct desync_profile
 	bool hostlist_auto_retrans_reset;
 
 	hostfail_pool *hostlist_auto_fail_counters;
+	time_t hostlist_auto_last_purge;
 
 	struct func_list_head lua_desync;
 };
