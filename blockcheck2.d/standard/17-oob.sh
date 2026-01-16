@@ -5,14 +5,9 @@ pktws_oob()
 	# $1 - test function
 	# $2 - domain
 
-	local dropacks urp wfempty
-	for dropack in '' ':drop_ack'; do
-		for urp in b 0 2 midsld; do
-			# drop_ack cannot drop anything if it does not come. windows default --wf-tcp-empty=0 stop empty ACKs
-			wfempty=
-			[ -n "$dropack" -a "$UNAME" = CYGWIN ] && wfempty="--wf-tcp-empty=1"
-			pktws_curl_test_update "$1" "$2" $wfempty --in-range=-s1 --lua-desync=oob:urp=$urp$dropack
-		done
+	local dropacks urp
+	for urp in b 0 2 midsld; do
+		pktws_curl_test_update "$1" "$2" --in-range=-s1 --lua-desync=oob:urp=$urp$dropack
 	done
 }
 
