@@ -3995,7 +3995,7 @@ function tcpseg(ctx, desync)
 ### oob
 
 ```
-function tcpseg(ctx, desync)
+function oob(ctx, desync)
 ```
 
 - arg: char=c - 1 символ oob
