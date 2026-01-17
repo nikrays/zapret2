@@ -1278,11 +1278,11 @@ void lua_pushf_iphdr(lua_State *L, const struct ip *ip, size_t len)
 		lua_pushf_int(L,"ip_off",ntohs(ip->ip_off));
 		lua_pushf_int(L,"ip_ttl",ip->ip_ttl);
 		lua_pushf_int(L,"ip_p",ip->ip_p);
-		lua_pushf_int(L,"ip_sum",ip->ip_sum);
+		lua_pushf_int(L,"ip_sum",ntohs(ip->ip_sum));
 		lua_pushf_raw(L,"ip_src",&ip->ip_src,sizeof(struct in_addr));
 		lua_pushf_raw(L,"ip_dst",&ip->ip_dst,sizeof(struct in_addr));
 		if (b_has_opt)
-			lua_pushf_raw(L,"options",(uint8_t*)(ip+1),hl-sizeof(struct tcphdr));
+			lua_pushf_raw(L,"options",(uint8_t*)(ip+1),hl-sizeof(struct ip));
 	}
 	else
 		lua_pushnil(L);

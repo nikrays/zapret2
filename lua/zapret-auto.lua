@@ -58,6 +58,7 @@ function automate_host_record(desync)
 end
 -- per-connection storage
 function automate_conn_record(desync)
+	if not desync.track then return nil end
 	if not desync.track.lua_state.automate then
 		desync.track.lua_state.automate = {}
 	end
