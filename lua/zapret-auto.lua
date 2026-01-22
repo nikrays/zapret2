@@ -179,7 +179,7 @@ function standard_failure_detector(desync, crec)
 						DLOG("standard_failure_detector: not counting incoming RST s"..seq.." beyond s"..arg.inseq)
 					end
 				end
-			elseif not arg.no_http_redirect and desync.l7payload=="http_reply" and desync.track.hostname then
+			elseif not arg.no_http_redirect and desync.l7payload=="http_reply" and desync.track and desync.track.hostname then
 				local hdis = http_dissect_reply(desync.dis.payload)
 				if hdis and (hdis.code==302 or hdis.code==307) then
 					local idx_loc = array_field_search(hdis.headers, "header_low", "location")
@@ -341,7 +341,7 @@ function circular(ctx, desync)
 	orchestrate(ctx, desync)
 
 	if not desync.track then
-		DLOG("circular: conntrack is missing but required")
+		DLOG_ERR("circular: conntrack is missing but required")
 		return
 	end
 
