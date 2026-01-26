@@ -2353,7 +2353,8 @@ uint8_t lua_ip6_l4proto_from_dissect(lua_State *L, int idx)
 	return IPPROTO_NONE;
 }
 
-bool lua_reconstruct_dissect(lua_State *L, int idx, uint8_t *buf, size_t *len, bool keepsum, bool badsum, bool ip6_preserve_next)
+// last_proto = IPPROTO_NONE means auto detect
+bool lua_reconstruct_dissect(lua_State *L, int idx, uint8_t *buf, size_t *len, bool keepsum, bool badsum, uint8_t last_proto, bool ip6_preserve_next)
 {
 	uint8_t *data = buf;
 	size_t sz,l,lpayload,l3,left = *len;
@@ -2386,7 +2387,7 @@ bool lua_reconstruct_dissect(lua_State *L, int idx, uint8_t *buf, size_t *len, b
 		lua_getfield(L,idx,"ip6");
 		if (lua_type(L,-1)!=LUA_TTABLE) goto err;
 		ip6 = (struct ip6_hdr*)data;
-		if (!lua_reconstruct_ip6hdr(L,-1, ip6, &l, lua_ip6_l4proto_from_dissect(L,idx), ip6_preserve_next))
+		if (!lua_reconstruct_ip6hdr(L,-1, ip6, &l, last_proto==IPPROTO_NONE ? lua_ip6_l4proto_from_dissect(L,idx) : last_proto, ip6_preserve_next))
 		{
 			DLOG_ERR("reconstruct_dissect: bad ip6\n");
 			goto err;
@@ -2556,12 +2557,14 @@ static int luacall_reconstruct_dissect(lua_State *L)
 
 	size_t l;
 	uint8_t buf[RECONSTRUCT_MAX_SIZE] __attribute__((aligned(16)));
+	uint8_t last_proto;
+
 	l = sizeof(buf);
 
 	bool ip6_preserve_next, badsum, keepsum;
-	lua_reconstruct_extract_options(L, 2, &keepsum, &badsum, &ip6_preserve_next, NULL);
+	lua_reconstruct_extract_options(L, 2, &keepsum, &badsum, &ip6_preserve_next, &last_proto);
 
-	if (!lua_reconstruct_dissect(L, 1, buf, &l, keepsum, badsum, ip6_preserve_next))
+	if (!lua_reconstruct_dissect(L, 1, buf, &l, keepsum, badsum, last_proto, ip6_preserve_next))
 		luaL_error(L, "invalid dissect data");
 	lua_pushlstring(L,(char*)buf,l);
 
@@ -2865,13 +2868,15 @@ static int luacall_rawsend_dissect(lua_State *L)
 	sockaddr_in46 sa;
 	bool b, badsum, keepsum, ip6_preserve_next;
 	uint8_t buf[RECONSTRUCT_MAX_SIZE] __attribute__((aligned(16)));
+	uint8_t last_proto;
+
 	len = sizeof(buf);
 
 	luaL_checktype(L,1,LUA_TTABLE);
 	lua_rawsend_extract_options(L,2, &repeats, &fwmark, &ifout);
-	lua_reconstruct_extract_options(L, 3, &keepsum, &badsum, &ip6_preserve_next, NULL);
+	lua_reconstruct_extract_options(L, 3, &keepsum, &badsum, &ip6_preserve_next, &last_proto);
 
-	if (!lua_reconstruct_dissect(L, 1, buf, &len, keepsum, badsum, ip6_preserve_next))
+	if (!lua_reconstruct_dissect(L, 1, buf, &len, keepsum, badsum, last_proto, ip6_preserve_next))
 		luaL_error(L, "invalid dissect data");
 
 	if (!extract_dst(buf, len, (struct sockaddr*)&sa))
@@ -3868,11 +3873,13 @@ static void lua_init_const(void)
 		{"IPV6_FLOWINFO_MASK",0x0FFFFFFF},
 
 		{"IPPROTO_IP",IPPROTO_IP},
+		{"IPPROTO_IPIP",IPPROTO_IPIP},
 		{"IPPROTO_IPV6",IPPROTO_IPV6},
 		{"IPPROTO_ICMP",IPPROTO_ICMP},
 		{"IPPROTO_TCP",IPPROTO_TCP},
 		{"IPPROTO_UDP",IPPROTO_UDP},
 		{"IPPROTO_ICMPV6",IPPROTO_ICMPV6},
+		{"IPPROTO_SCTP",IPPROTO_SCTP},
 		{"IPPROTO_HOPOPTS",IPPROTO_HOPOPTS},
 		{"IPPROTO_ROUTING",IPPROTO_ROUTING},
 		{"IPPROTO_FRAGMENT",IPPROTO_FRAGMENT},

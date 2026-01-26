@@ -558,6 +558,23 @@ function test_dissect()
 		print( raw1==raw2 and "DISSECT OK" or "DISSECT FAILED" )
 		test_assert(raw1==raw2)
 
+		raw1 = string.sub(reconstruct_dissect(ip6_udp),1,-4-#ip6_udp.payload)
+		dis1 = dissect(raw1, false)
+		dis2 = dissect(raw1, true)
+		local ok = not dis1.ip6 and dis2.ip6
+		print("IP6 partial : "..(ok and "OK" or "FAIL"))
+		test_assert(ok)
+
+		print("IP6+IPP")
+		dis1 = {ip6 = ip6_udp.ip6, payload=brandom(math.random(1,1))}
+		raw1 = reconstruct_dissect(dis1,{ip6_last_proto=IPPROTO_IPIP})
+		dis2 = dissect(raw1)
+		raw2 = reconstruct_dissect(dis2,{ip6_preserve_next=true})
+		print("IP6+IPP1: "..string2hex(raw1))
+		print("IP6+IPP2: "..string2hex(raw2))
+		print( raw1==raw2 and "DISSECT OK" or "DISSECT FAILED" )
+		test_assert(raw1==raw2)
+
 		print("UDP standalone")
 		raw1 = reconstruct_udphdr(ip6_udp.udp)
 		print("UDP1: "..string2hex(raw1))
@@ -576,13 +593,6 @@ function test_dissect()
 		print("IP2: "..string2hex(raw2))
 		print( raw1==raw2 and "DISSECT OK" or "DISSECT FAILED" )
 		test_assert(raw1==raw2)
-
-		raw1 = string.sub(reconstruct_dissect(ip6_udp),1,-4-#ip6_udp.payload)
-		dis1 = dissect(raw1, false)
-		dis2 = dissect(raw1, true)
-		local ok = not dis1.ip6 and dis2.ip6
-		print("IP6 partial : "..(ok and "OK" or "FAIL"))
-		test_assert(ok)
 	end
 end
 
@@ -967,4 +977,27 @@ function test_rawsend(opts)
 	dis = {ip6 = ip6, icmp = icmp, payload = payload}
 	print("send ipv6 icmp")
 	test_assert(rawsend_dissect_print(dis, {fwmark = 0x8E10, repeats=3}))
+
+	local ip2 = {
+		ip_tos = 0,
+		ip_id = math.random(0,0xFFFF),
+		ip_off = 0,
+		ip_ttl = 64,
+		ip_p = IPPROTO_UDP,
+		ip_src = pton("10.1.1.1"),
+		ip_dst = pton("10.1.1.2"),
+	}
+
+	dis = {ip = ip2, udp = udp, payload = payload}
+	raw_udp = reconstruct_dissect(dis)
+
+	ip6.ip6_flow=0x6000583F
+	dis = {ip6 = ip6, payload = raw_udp}
+	print("send ipv6 ipip")
+	test_assert(rawsend_dissect_print(dis, {fwmark = 0x8E10, repeats=3}, {ip6_last_proto=IPPROTO_IPIP}))
+
+	dis = {ip = ip, payload = raw_udp}
+	dis.ip.ip_p = IPPROTO_IPIP
+	print("send ipv4 ipip")
+	test_assert(rawsend_dissect_print(dis, {fwmark = 0x8E10, repeats=3}, {ip6_last_proto=IPPROTO_IPIP}))
 end

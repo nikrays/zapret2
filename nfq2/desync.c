@@ -1073,7 +1073,7 @@ static uint8_t desync(
 			}
 			else
 			{
-				b = lua_reconstruct_dissect(params.L, -1, mod_pkt, len_mod_pkt, false, false, false);
+				b = lua_reconstruct_dissect(params.L, -1, mod_pkt, len_mod_pkt, false, false, IPPROTO_NONE, false);
 				lua_pop(params.L, 2);
 				if (!b)
 				{

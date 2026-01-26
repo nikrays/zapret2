@@ -112,7 +112,7 @@ bool lua_reconstruct_iphdr(lua_State *L, int idx, struct ip *ip, size_t *len);
 bool lua_reconstruct_tcphdr(lua_State *L, int idx, struct tcphdr *tcp, size_t *len);
 bool lua_reconstruct_udphdr(lua_State *L, int idx, struct udphdr *udp);
 bool lua_reconstruct_icmphdr(lua_State *L, int idx, struct icmp46 *icmp);
-bool lua_reconstruct_dissect(lua_State *L, int idx, uint8_t *buf, size_t *len, bool keepsum, bool badsum, bool ip6_preserve_next);
+bool lua_reconstruct_dissect(lua_State *L, int idx, uint8_t *buf, size_t *len, bool keepsum, bool badsum, uint8_t last_proto, bool ip6_preserve_next);
 
 typedef struct {
 	unsigned int func_n;
