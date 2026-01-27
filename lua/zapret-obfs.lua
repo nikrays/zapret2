@@ -119,30 +119,34 @@ function ippxor(ctx, desync)
 		end
 	end
 
-	local l3_from = ip_proto_l3(desync.dis)
-	local l3_to = bitxor(l3_from, ippxor)
-
-	local bdxor = dxor(desync.dis)
-	if bdxor then
-		DLOG("ippxor: dataxor out")
-	end
-	fix_ip_proto(desync.dis, l3_to)
-
-	local raw_ip = reconstruct_dissect(desync.dis, {ip6_preserve_next=true})
-
-	local dis = dissect(raw_ip)
-	if not dis.ip and not dis.ip6 then
-		DLOG_ERR("ippxor: could not rebuild packet")
-		return
-	end
-
-	if not bdxor then
-		if dxor(dis) then
-			DLOG("ippxor: dataxor in")
+	local bdxor
+	if dataxor then
+		bdxor = dxor(desync.dis)
+		if bdxor then
+			DLOG("ippxor: dataxor out")
 		end
 	end
 
-	desync.dis = dis
+	local l3_from = ip_proto_l3(desync.dis)
+	local l3_to = bitxor(l3_from, ippxor)
+	fix_ip_proto(desync.dis, l3_to)
 	DLOG("ippxor: "..l3_from.." => "..l3_to)
+
+	if dataxor then
+		local raw_ip = reconstruct_dissect(desync.dis, {ip6_preserve_next=true})
+		local dis = dissect(raw_ip)
+		if not dis.ip and not dis.ip6 then
+			DLOG_ERR("ippxor: could not rebuild packet")
+			return
+		end
+
+		if not bdxor then
+			if dxor(dis) then
+				DLOG("ippxor: dataxor in")
+			end
+		end
+		desync.dis = dis
+	end
+
 	return VERDICT_MODIFY + VERDICT_PRESERVE_NEXT
 end
