@@ -804,6 +804,10 @@ nfqws2 сигнатурно распознает типы пейлоадов о�
 | stun            | udp | stun |
 | dns             | udp | dns_query<br>dns_response |
 | dtls            | udp | dtls_client_hello<br>dtls_server_hello |
+| любой           | udp | ipv4<br>ipv6<br>icmp|
+
+Особые типы пейлоада - ipv4,ipv6,icmp. ipv4 и ipv6 генерируются, когда icmp содержит прикрепленный пакет.
+В остальных случаях icmp имеет тип пейлоада "icmp".
 
 ## Использование множественных профилей
 
@@ -1737,7 +1741,7 @@ conntrack работает только с tcp и udp, он не ведет уч
 | IP6                                                                                                                                                                                                                                                                | number | бит "More fragment" поля ip6f_offlg из ipv6 fragment header                                      | 0x0001                                              |
 | IPV6_FLOWLABEL_MASK                                                                                                                                                                                                                                                | number | flow label в ip6_flow                                                                            | 0x000FFFFF                                          |
 | IPV6_FLOWINFO_MASK                                                                                                                                                                                                                                                 | number | flow label, traffic class в ip6_flow                                                             | 0x0FFFFFFF                                          |
-| IPPROTO_IP<br>IIPPROTO_IPV6<br>IPPROTO_IPIP<br>IPPROTO_ICMP<br>IPPROTO_ICMPV6<br>IPPROTO_TCP<br>IPPROTO_UDP<br>IPPROTO_SCTP<br>IPPROTO_HOPOPTS<br>IPPROTO_ROUTING<br>IPPROTO_FRAGMENT<br>IPPROTO_AH<br>IPPROTO_ESP<br>IPPROTO_DSTOPTS<br>IPPROTO_MH<br>IPPROTO_HIP<br>IPPROTO_SHIM6<br>IPPROTO_NONE | number | [номера IP протоколов](https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml) | используются в ipv4 и ipv6                          |
+| IPPROTO_IP<br>IPPROTO_IPV6<br>IPPROTO_IPIP<br>IPPROTO_ICMP<br>IPPROTO_ICMPV6<br>IPPROTO_TCP<br>IPPROTO_UDP<br>IPPROTO_SCTP<br>IPPROTO_HOPOPTS<br>IPPROTO_ROUTING<br>IPPROTO_FRAGMENT<br>IPPROTO_AH<br>IPPROTO_ESP<br>IPPROTO_DSTOPTS<br>IPPROTO_MH<br>IPPROTO_HIP<br>IPPROTO_SHIM6<br>IPPROTO_NONE | number | [номера IP протоколов](https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml) | используются в ipv4 и ipv6                          |
 | ICMP_ECHOREPLY<br>ICMP_DEST_UNREACH<br>ICMP_REDIRECT<br>ICMP_ECHO<br>ICMP_TIME_EXCEEDED<brICMP_PARAMETERPROB<br>ICMP_TIMESTAMP<br>ICMP_TIMESTAMPREPLY<br>ICMP_INFO_REQUEST<br>ICMP_INFO_REPLY | number | типы icmp |
 | ICMP_UNREACH_NET<br>ICMP_UNREACH_HOST<br>ICMP_UNREACH_PROTOCOL<br>ICMP_UNREACH_PORT<br>ICMP_UNREACH_NEEDFRAG<br>ICMP_UNREACH_SRCFAIL<br>ICMP_UNREACH_NET_UNKNOWN<br>ICMP_UNREACH_HOST_UNKNOWN<br>ICMP_UNREACH_NET_PROHIB<br>ICMP_UNREACH_HOST_PROHIB<br>ICMP_UNREACH_TOSNET<br>ICMP_UNREACH_TOSHOST<br>ICMP_UNREACH_FILTER_PROHIB<br>ICMP_UNREACH_HOST_PRECEDENCE<br>ICMP_UNREACH_PRECEDENCE_CUTOFF | number | коды icmp для destination unreachable |
 | ICMP_REDIRECT_NET<br>ICMP_REDIRECT_HOST<br>ICMP_REDIRECT_TOSNET<br>ICMP_REDIRECT_TOSHOST | number | коды icmp для icmp redirect |
