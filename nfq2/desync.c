@@ -2014,7 +2014,7 @@ static uint8_t dpi_desync_icmp_packet(
 	sdip4 = dis->ip ? bReverseFixed ? &dis->ip->ip_src : &dis->ip->ip_dst : NULL;
 
 	verdict = desync(
-		dp, fwmark, ifin, ifout, bReverseFixed, ctrack, NULL, l7payload, L7_UNKNOWN,
+		dp, fwmark, ifin, ifout, bReverseFixed, ctrack, NULL, l7payload, ctrack ? ctrack->l7proto : L7_UNKNOWN,
 		dis, sdip4, sdip6, 0, mod_pkt, len_mod_pkt, 0, 0, 0, NULL, 0, NULL, 0);
 
 	return verdict;
