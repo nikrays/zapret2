@@ -10,7 +10,7 @@
 -- NOTE : this function does not depend on zapret-lib.lua and should not be run under orchestrator (uses direct instance_cutoff)
 function wgobfs(ctx, desync)
 	if not desync.dis.udp then
-		instance_cutoff(ctx)
+		instance_cutoff_shim(ctx, desync)
 		return
 	end
 
