@@ -437,6 +437,13 @@ nfqws2 \
 Всегда можно откатиться на нулевой код, но тогда у сервера без фильтра по IP клиента будет плохая защита от обычных пингов - все они будут преобразовываться в udp и направляться в wireguard,
 который будет их игнорировать, поскольку передается мусор. Сервер перестанет пингаться.
 
+Работающие пары, пробрасываемые Linux NAT :
+
+- ctype=8:stype=0 - echo request - echo reply (используется по умолчанию)
+- ctype=13:stype=14 - timestamp - timestamp reply
+- ctype=15:stype=16 - information request - information reply
+- ctype=17:stype=18 - address mask request - address mask reply
+
 wireguard server - `1.2.3.4:5555`
 
 ```
