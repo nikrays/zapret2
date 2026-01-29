@@ -19,6 +19,7 @@
   - [Protocol detection](#protocol-detection)
   - [Using multiple profiles](#using-multiple-profiles)
     - [Profile templates](#profile-templates)
+    - [Filtering by ipsets](#filtering-by-ipsets)
     - [Filtering by lists](#filtering-by-lists)
     - [Autohostlist failure detector](#autohostlist-failure-detector)
     - [Network presence filter](#network-presence-filter)
@@ -819,6 +820,12 @@ In this example, there are 3 active profiles and 3 templates, one of which impor
 - Profile **prof3** receives `<parameters_3>`. It does not import any templates.
 
 Any parameters applicable to profiles, including filters, are allowed within templates.
+
+### Filtering by ipsets
+
+- In case of tcp or udp server address is matched in client mode и and client address in [server](#server-mode).
+- related icmp use cached profile from the original packet.
+- Unrelated icmp and и raw ip are matched by either source or destination ip. To match ipset any of two must match.
 
 ### Filtering by lists
 
