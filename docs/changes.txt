@@ -208,6 +208,6 @@ v0.8.1
 * nfqws2: VERDICT_PRESERVE_NEXT
 * nfqws2: keepsum reconstruct option
 * nfqws2: more helpers
-* zapret-obfs: ippxor, udp2icmp
+* zapret-obfs: ippxor, udp2icmp, synhide
 * nfqws2: LUA_COMPAT_VER=5
 * winws2: --wf-raw-filter

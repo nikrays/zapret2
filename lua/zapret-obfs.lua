@@ -158,12 +158,12 @@ end
 -- test case:
 --  endpoint1:
 --   --in-range=a --lua-desync=udp2icmp
---   nft add rule inet ztest2 post meta mark and 0x40000000 == 0 udp dport 12345 queue num 200 bypass
---   nft add rule inet ztest2 pre meta mark and 0x40000000 == 0 meta l4proto "{icmp,icmpv6}" queue num 200 bypass
+--   nft add rule inet ztest post meta mark and 0x40000000 == 0 udp dport 12345 queue num 200 bypass
+--   nft add rule inet ztest pre meta mark and 0x40000000 == 0 meta l4proto "{icmp,icmpv6}" queue num 200 bypass
 --  endpoint2:
 --   --in-range=a --lua-desync=udp2icmp --server
---   nft add rule inet ztest2 post meta mark and 0x40000000 == 0 udp sport 12345 queue num 200 bypass
---   nft add rule inet ztest2 pre meta mark and 0x40000000 == 0 meta l4proto "{icmp,icmpv6}" queue num 200 bypass
+--   nft add rule inet ztest post meta mark and 0x40000000 == 0 udp sport 12345 queue num 200 bypass
+--   nft add rule inet ztest pre meta mark and 0x40000000 == 0 meta l4proto "{icmp,icmpv6}" queue num 200 bypass
 -- packs udp datagram to icmp message without changing packet size
 -- function keeps icmp identifier as (sport xor dport) to help traverse NAT (it won't help if NAT changes id)
 -- one end must be in server mode, another - in client mode
@@ -255,4 +255,99 @@ function udp2icmp(ctx, desync)
 		plxor()
 		return VERDICT_MODIFY
 	end
+end
+
+-- test case :
+--  client:
+--   --in-range="<d1" --out-range="<d1" --lua-desync=desync=synhide:synack:ghost=2
+--   nft add rule inet ztest post meta mark & 0x40000000 == 0x00000000 tcp dport 80 tcp flags & (fin | syn | rst | ack | urg) == syn queue flags bypass to 200
+--   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp sport 80 tcp flags & (fin | syn | rst | ack | urg) == (rst | ack) tcp urgptr != 0 queue flags bypass to 200
+--  server:
+--   --in-range=a --lua-desync=synhide:synack
+--   nft add rule inet ztest post meta mark & 0x40000000 == 0x00000000 tcp sport 80 tcp flags & (fin | syn | rst | ack | urg) == (syn | ack) queue flags bypass to 200
+--   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp dport 80 tcp flags & (fin | syn | rst | ack | urg) == ack tcp urgptr != 0 queue flags bypass to 200
+-- arg : ghost - ghost syn ttl for ipv4. must be hop_to_last_nat+1. syn is not ghosted if not supplied
+-- arg : ghost6 - ghost syn hl for ipv6. must be hop_to_last_nat+1. syn is not ghosted if not supplied
+-- arg : synack - also fake synack
+function synhide(ctx, desync)
+	if not desync.dis.tcp then
+		instance_cutoff_shim(ctx, desync)
+		return
+	end
+
+	local fl = bitand(desync.dis.tcp.th_flags, TH_SYN+TH_ACK+TH_FIN+TH_RST+TH_URG)
+
+	local function make_magic(client)
+		local m
+		-- use client seq0
+		m = client and desync.dis.tcp.th_seq or desync.dis.tcp.th_ack-1
+		m = bitxor(bitrshift(m,16),bitand(m,0xFFFF))
+		if m==0 then
+			-- 0 is not acceptable
+			m = client and desync.dis.tcp.th_dport or desync.dis.tcp.th_sport
+		end
+		return m
+	end
+	local function set_magic(client)
+		desync.dis.tcp.th_urp = make_magic(client)
+	end
+	local function ver_magic(client)
+		return desync.dis.tcp.th_urp == make_magic(client)
+	end
+	local function clear_magic()
+		return desync.dis.tcp.th_urp == 0
+	end
+
+	if fl==TH_SYN then
+		-- client sent
+		local ttl = tonumber(desync.dis.ip and desync.arg.ghost or desync.arg.ghost6)
+		if ttl then
+			DLOG("synhide: punch NAT hole with ttl="..ttl)
+			local dis = deepcopy(desync.dis)
+			if dis.ip then
+				dis.ip.ip_ttl = ttl
+			elseif dis.ip6 then
+				dis.ip6.ip6_hlim = ttl
+			end
+			if not rawsend_dissect(dis, rawsend_opts_base(desync)) then
+				instance_cutoff_shim(ctx, desync) -- failed
+				return
+			end
+		end
+		DLOG("synhide: client sends SYN. remove SYN")
+		set_magic(true)
+		-- remove SYN, set ACK
+		desync.dis.tcp.th_flags = bitor(bitand(desync.dis.tcp.th_flags, bitnot(TH_SYN)), TH_ACK)
+		if not desync.arg.synack then
+			DLOG("synhide: mission complete")
+			instance_cutoff_shim(ctx, desync)
+		end
+		return VERDICT_MODIFY
+	elseif fl==(TH_SYN+TH_ACK) then
+		-- server sent
+		if desync.arg.synack then
+			DLOG("synhide: server sends SYN+ACK. remove SYN, set RST")
+			set_magic(false)
+			desync.dis.tcp.th_flags = bitor(bitand(desync.dis.tcp.th_flags, bitnot(TH_SYN)), TH_RST)
+			return VERDICT_MODIFY
+		else
+			DLOG("synhide: server sends SYN+ACK. do not remove SYN because 'synack' arg is not set.")
+			return -- do nothing
+		end
+	elseif fl==TH_ACK and ver_magic(true) then
+		DLOG("synhide: server received magic. restore SYN")
+		desync.dis.tcp.th_flags = bitor(bitand(desync.dis.tcp.th_flags, bitnot(TH_ACK)), TH_SYN)
+		clear_magic()
+		return VERDICT_MODIFY
+	elseif fl==(TH_ACK+TH_RST) and ver_magic(false) then
+		-- client received
+		DLOG("synhide: client received magic. restore SYN, remove RST")
+		desync.dis.tcp.th_flags = bitor(bitand(desync.dis.tcp.th_flags, bitnot(TH_RST)), TH_SYN)
+		DLOG("synhide: mission complete")
+		instance_cutoff_shim(ctx, desync)
+		return VERDICT_MODIFY
+	end
+
+	DLOG("synhide: sequence failed")
+	instance_cutoff_shim(ctx, desync)
 end
