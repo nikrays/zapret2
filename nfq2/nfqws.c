@@ -660,7 +660,7 @@ exiterr:
 
 #define WINDIVERT_BULK_MAX		128
 // do not make it less than 65536 - loopback packets can be up to 64K
-#define WINDIVERT_PACKET_BUF_SIZE	192000
+#define WINDIVERT_PACKET_BUF_SIZE	3*196608 // 3*64K, 128*1500=192000
 
 static int win_main()
 {
