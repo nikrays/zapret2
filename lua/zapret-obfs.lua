@@ -257,34 +257,43 @@ function udp2icmp(ctx, desync)
 	end
 end
 
--- test case :
---  client:
---   --in-range="<d1" --out-range="<d1" --lua-desync=desync=synhide:synack:ghost=2
---   nft add rule inet ztest post meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == syn queue flags bypass to 200
---   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (rst | ack) tcp urgptr != 0 queue flags bypass to 200
---   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (rst | ack) tcp option 172 exists queue flags bypass to 200
---   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (rst | ack) @th,100,4 != 0 queue flags bypass to 200
---   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (rst | ack) ct state new queue flags bypass to 200
---  server:
---   --in-range=a --lua-desync=synhide:synack
---   nft add rule inet ztest post meta mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (syn | ack) queue flags bypass to 200
---   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == ack tcp urgptr != 0 queue flags bypass to 200
---   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == ack tcp option 172 exists queue flags bypass to 200
---   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == ack @th,100,4 != 0 queue flags bypass to 200
---   nft add rule inet ztest pre meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == ack ct state new queue flags bypass to 200
--- hides tcp handshake from DPI optionally using ghost SYN packet with low ttl to punch NAT hole
--- NOTE: linux conntrack treats packets without SYN in SYN_SENT state as INVALID ! NAT does not work !
--- NOTE: the only found workaround - put NFQUEUE handler to that packet. It should only return pass verdict.
--- NOTE: BSD and CGNAT should work
--- NOTE: won't likely pass home routers even with hardware offload enabled - SYN state is managed in netfilter before offload. but can work from router itself.
--- arg : ghost - ghost syn ttl for ipv4. must be hop_to_last_nat+1. syn is not ghosted if not supplied
--- arg : ghost6 - ghost syn hl for ipv6. must be hop_to_last_nat+1. syn is not ghosted if not supplied
--- arg : synack - also fake synack
--- arg : magic=[tsecr|x2|urp|opt] - where to put magic value to recognize modified packets
--- arg : x2=bit - th_x2 bit used for magic=x2 - 1,2,4,8
--- arg : kind - kind of tcp option for magic=opt
--- arg : opt=hex - tcp option value
--- arg : xorseq=hex - 4 hex bytes to xor seq
+--[[
+ test case :
+ both:
+   nft create table inet ztest
+   nft add chain inet ztest post "{type filter hook output priority mangle;}"
+   nft add chain inet ztest pre "{type filter hook input priority mangle;}"
+   nft add chain inet ztest predefrag "{type filter hook output priority -401;}"
+   nft add rule inet ztest predefrag "mark & 0x40000000 != 0x00000000 notrack"
+ client:
+   --in-range="<d1" --out-range="<d1" --lua-desync=synhide:synack:ghost=2
+   nft add rule inet ztest post "meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == syn queue flags bypass to 200"
+   nft add rule inet ztest pre meta "mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (rst | ack) tcp urgptr != 0 queue flags bypass to 200"
+   nft add rule inet ztest pre meta "mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (rst | ack) tcp option 172 exists queue flags bypass to 200"
+   nft add rule inet ztest pre meta "mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (rst | ack) @th,100,4 != 0 queue flags bypass to 200"
+  server:
+   --in-range=a --lua-desync=synhide:synack
+   nft add rule inet ztest post "meta mark & 0x40000000 == 0x00000000 tcp sport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == (syn | ack) queue flags bypass to 200"
+   nft add rule inet ztest pre "meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == ack tcp urgptr != 0 queue flags bypass to 200"
+   nft add rule inet ztest pre "meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == ack tcp option 172 exists queue flags bypass to 200"
+   nft add rule inet ztest pre "meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == ack @th,100,4 != 0 queue flags bypass to 200"
+   nft add rule inet ztest pre "meta mark & 0x40000000 == 0x00000000 tcp dport { 80, 443 } tcp flags & (fin | syn | rst | ack | urg) == ack ct state new queue flags bypass to 200"
+
+ hides tcp handshake from DPI optionally using ghost SYN packet with low ttl to punch NAT hole
+ NOTE: linux conntrack treats packets without SYN in SYN_SENT state as INVALID ! NAT does not work !
+ NOTE: the only found workaround - put NFQUEUE handler to that packet. It should only return pass verdict.
+ NOTE: BSD and CGNAT should work
+ NOTE: won't likely pass home routers even with hardware offload enabled - SYN state is managed in netfilter before offload. but can work from router itself.
+
+ arg : ghost - ghost syn ttl for ipv4. must be hop_to_last_nat+1. syn is not ghosted if not supplied
+ arg : ghost6 - ghost syn hl for ipv6. must be hop_to_last_nat+1. syn is not ghosted if not supplied
+ arg : synack - also fake synack. NOTE: will likely not work with magic=tsecr on *nix clients because they expect valid echoed tsecr in SYN,ACK
+ arg : magic=[x2|urp|opt|tsecr] - where to put magic value to recognize modified packets
+ arg : x2=bit - th_x2 bit used for magic=x2 - 1,2,4,8
+ arg : kind - kind of tcp option for magic=opt
+ arg : opt=hex - tcp option value
+ arg : xorseq=hex - 4 hex bytes to xor seq
+--]]
 function synhide(ctx, desync)
 	if not desync.dis.tcp then
 		instance_cutoff_shim(ctx, desync)
@@ -299,13 +308,13 @@ function synhide(ctx, desync)
 			error("synhide: invalid magic mode '"..desync.arg.magic.."'")
 		end
 		magic = desync.arg.magic
-		if magic=="tsecr" and not isidx then
+		if magic=="tsecr" and not tsidx then
 			DLOG("synhide: cannot use tsecr magic because timestamp option is absent")
 			instance_cutoff_shim(ctx, desync)
 			return
 		end
 	else
-		magic = tsidx and "tsecr" or "x2"
+		magic = "x2"
 	end
 	DLOG("synhide: magic="..magic)
 
@@ -453,6 +462,7 @@ function synhide(ctx, desync)
 		DLOG("synhide: server received magic. restore SYN")
 		desync.dis.tcp.th_flags = bitor(bitand(desync.dis.tcp.th_flags, bitnot(TH_ACK)), TH_SYN)
 		clear_magic()
+		desync.track,out = conntrack_feed(desync.dis)
 		if not desync.arg.synack then
 			DLOG("synhide: mission complete")
 			instance_cutoff_shim(ctx, desync)
