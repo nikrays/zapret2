@@ -414,7 +414,7 @@ struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 
 	return entry;
 }
-#define DP_COPY_SIMPLE(v) if (from->b_##v) to->v=from->v;
+#define DP_COPY_SIMPLE(v) if (from->b_##v) {to->v=from->v; to->b_##v=true;}
 bool dp_copy(struct desync_profile *to, const struct desync_profile *from)
 {
 	DP_COPY_SIMPLE(hostlist_auto_fail_threshold)
