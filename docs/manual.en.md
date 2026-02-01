@@ -800,7 +800,7 @@ When there are many complex and repetitive strategies or groups of the same para
 A template is also a profile but it doesn't go to the working profile list but to a separate list of templates.
 The profile becomes a template by setting the `--template = <name>` parameter.
 It can then be imported (`--import = <name>`) into another profile or template.
-Simple parameters - number, string or bool - are imported only if they were specified in the imported template. When you import a template into a template in the destination template, they are also considered specified.
+Simple parameters - number, string, bool, `--filter-l3` - are imported only if they were specified in the imported template. When you import a template into a template in the destination template, they are also considered specified.
 List parameters are added to the end of the corresponding list. Such parameters are anything that can take a list of values. For example, hostlists or `--filter-tcp`.
 The template number and name are not copied.
 
