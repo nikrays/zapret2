@@ -18,7 +18,7 @@ static bool addpool(hostlist_pool **hostlist, char **s, const char *end, int *ct
 			p = ++(*s);
 			flags |= HOSTLIST_POOL_FLAG_STRICT_MATCH;
 		}
-		for (; p<end && *p && *p!=' ' && *p!='\t' && *p!='\r' && *p != '\n'; p++) *p=tolower(*p);
+		for (; p<end && *p && *p!=' ' && *p!='\t' && *p!='\r' && *p != '\n'; p++) *p=tolower((unsigned char)*p);
 		if (!HostlistPoolAddStrLen(hostlist, *s, p-*s, flags))
 		{
 			HostlistPoolDestroy(hostlist);

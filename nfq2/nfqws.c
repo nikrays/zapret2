@@ -1003,13 +1003,13 @@ static struct blob_item *load_const_blob_to_collection(const char *name, const v
 
 
 
-static bool parse_uid(const char *opt, uid_t *uid, gid_t *gid, int *gid_count, int max_gids)
+static bool parse_uid(char *opt, uid_t *uid, gid_t *gid, int *gid_count, int max_gids)
 {
 	unsigned int u;
 	char c, *p, *e;
 
 	*gid_count = 0;
-	if ((e = strchr(optarg, ':'))) *e++ = 0;
+	if ((e = strchr(opt, ':'))) *e++ = 0;
 	if (sscanf(opt, "%u", &u) != 1) return false;
 	*uid = (uid_t)u;
 	for (p = e; p; )

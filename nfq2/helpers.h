@@ -29,7 +29,7 @@ void qsort_ssize_t(ssize_t *array, int ct);
 int str_index(const char **strs, int count, const char *str);
 void rtrim(char *s);
 void replace_char(char *s, char from, char to);
-char *strncasestr(const char *s,const char *find, size_t slen);
+const char *strncasestr(const char *s,const char *find, size_t slen);
 // [a-zA-z][a-zA-Z0-9]*
 bool is_identifier(const char *p);
 

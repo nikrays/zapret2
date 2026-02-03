@@ -373,28 +373,28 @@ void print_icmphdr(const struct icmp46 *icmp, bool v6)
 
 bool proto_check_ipv4(const uint8_t *data, size_t len)
 {
-	return 	len >= sizeof(struct ip) && (data[0] & 0xF0) == 0x40 && (data[0] & 0x0F)>=5 &&
-		len >= ((data[0] & 0x0F) << 2);
+	if (len < sizeof(struct ip)) return false;
+	uint8_t off = ((struct ip*)data)->ip_hl << 2;
+	return off>=sizeof(struct ip) && len>=off;
 }
 // move to transport protocol
 void proto_skip_ipv4(const uint8_t **data, size_t *len)
 {
-	size_t l;
-
-	l = (**data & 0x0F) << 2;
-	*data += l;
-	*len -= l;
+	uint8_t off = ((struct ip*)*data)->ip_hl << 2;
+	*data += off;
+	*len -= off;
 }
 bool proto_check_tcp(const uint8_t *data, size_t len)
 {
-	return len >= sizeof(struct tcphdr) && len >= ((data[12] & 0xF0) >> 2);
+	if (len < sizeof(struct tcphdr)) return false;
+	uint8_t off = ((struct tcphdr*)data)->th_off << 2;
+	return off>=sizeof(struct tcphdr) && len>=off;
 }
 void proto_skip_tcp(const uint8_t **data, size_t *len)
 {
-	size_t l;
-	l = ((*data)[12] & 0xF0) >> 2;
-	*data += l;
-	*len -= l;
+	uint8_t off = ((struct tcphdr*)*data)->th_off << 2;
+	*data += off;
+	*len -= off;
 }
 bool proto_check_udp(const uint8_t *data, size_t len)
 {

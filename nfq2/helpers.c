@@ -61,25 +61,27 @@ void replace_char(char *s, char from, char to)
 	for(;*s;s++) if (*s==from) *s=to;
 }
 
-char *strncasestr(const char *s, const char *find, size_t slen)
+const char *strncasestr(const char *s, const char *find, size_t slen)
 {
 	char c, sc;
 	size_t len;
 
-	if ((c = *find++) != '\0')
+	if ((c = *find++))
 	{
 		len = strlen(find);
 		do
 		{
 			do
 			{
-				if (slen-- < 1 || (sc = *s++) == '\0') return NULL;
-			} while (toupper(c) != toupper(sc));
+				if (!slen) return NULL;
+				slen--;
+				sc = *s++;
+			} while (toupper((unsigned char)c) != toupper((unsigned char)sc));
 			if (len > slen)	return NULL;
-		} while (strncasecmp(s, find, len) != 0);
+		} while (strncasecmp(s, find, len));
 		s--;
 	}
-	return (char *)s;
+	return s;
 }
 
 static inline bool is_letter(char c)
