@@ -524,10 +524,15 @@ struct kavl_bit_elem *kavl_bit_get(const struct kavl_bit_elem *hdr, const void *
 
 static bool ipset_kavl_add(struct kavl_bit_elem **ipset, const void *a, uint8_t preflen)
 {
-	uint8_t bytelen = (preflen+7)>>3;
-	uint8_t *abuf = malloc(bytelen);
-	if (!abuf) return false;
-	memcpy(abuf,a,bytelen);
+	uint8_t *abuf, bytelen = (preflen+7)>>3;
+	if (bytelen)
+	{
+		abuf = malloc(bytelen);
+		if (!abuf) return false;
+		memcpy(abuf,a,bytelen);
+	}
+	else
+		abuf = NULL;
 	if (!kavl_bit_add(ipset,abuf,preflen,0))
 	{
 		free(abuf);
@@ -912,12 +917,15 @@ struct blob_item *blob_collection_add_blob(struct blob_collection_head *head, co
 {
 	struct blob_item *entry = calloc(1,sizeof(struct blob_item));
 	if (!entry) return NULL;
-	if (!(entry->data = malloc(size+size_reserve))) 
+	if (size+size_reserve)
 	{
-		free(entry);
-		return NULL;
+		if (!(entry->data = malloc(size+size_reserve)))
+		{
+			free(entry);
+			return NULL;
+		}
+		if (data) memcpy(entry->data,data,size);
 	}
-	if (data) memcpy(entry->data,data,size);
 	entry->size = size;
 	entry->size_buf = size+size_reserve;
 
