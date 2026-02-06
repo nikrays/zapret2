@@ -722,6 +722,8 @@ function test_csum()
 
 	raw = reconstruct_dissect({ip=ip, tcp=tcp, payload=payload})
 	dis1 = dissect(raw)
+	ip.ip_len = IP_BASE_LEN + #ip.options + #tcpb + #payload
+	ip4b = reconstruct_iphdr(ip)
 	tcpb = csum_tcp_fix(ip4b,tcpb,payload)
 	dis2 = dissect(ip4b..tcpb..payload)
 	print( dis1.tcp.th_sum==dis2.tcp.th_sum and "TCP+IP4 CSUM OK" or "TCP+IP4 CSUM FAILED" )
@@ -778,6 +780,8 @@ function test_csum()
 
 	raw = reconstruct_dissect({ip=ip, udp=udp, payload=payload})
 	dis1 = dissect(raw)
+	ip.ip_len = IP_BASE_LEN + #ip.options + #udpb + #payload
+	ip4b = reconstruct_iphdr(ip)
 	udpb = csum_udp_fix(ip4b,udpb,payload)
 	dis2 = dissect(ip4b..udpb..payload)
 	print( dis1.udp.uh_sum==dis2.udp.uh_sum and "UDP+IP4 CSUM OK" or "UDP+IP4 CSUM FAILED" )
