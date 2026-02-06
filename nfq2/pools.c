@@ -1115,6 +1115,22 @@ void ipcachePrint(ip_cache *ipcache)
 	ipcache6Print(ipcache->ipcache6);
 }
 
+ip_cache_item *ipcacheFind(ip_cache *ipcache, const struct in_addr *a4, const struct in6_addr *a6, const char *iface)
+{
+	ip_cache4 *ipcache4;
+	ip_cache6 *ipcache6;
+	if (a4)
+	{
+		if ((ipcache4 = ipcache4Find(ipcache->ipcache4,a4,iface)))
+			return &ipcache4->data;
+	}
+	else if (a6)
+	{
+		if ((ipcache6 = ipcache6Find(ipcache->ipcache6,a6,iface)))
+			return &ipcache6->data;
+	}
+	return NULL;
+}
 ip_cache_item *ipcacheTouch(ip_cache *ipcache, const struct in_addr *a4, const struct in6_addr *a6, const char *iface)
 {
 	ip_cache4 *ipcache4;

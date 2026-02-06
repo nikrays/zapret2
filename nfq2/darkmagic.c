@@ -1227,7 +1227,7 @@ bool win_dark_init(const struct str_list_head *ssid_filter, const struct str_lis
 		if (!f_WlanOpenHandle || !f_WlanCloseHandle || !f_WlanEnumInterfaces || !f_WlanQueryInterface || !f_WlanFreeMemory)
 		{
 			w_win32_error = GetLastError();
-			DLOG_ERR("could not import required functions from wlanapi.dll\n");
+			DLOG_ERR("could not import all required functions from wlanapi.dll\n");
 			win_dark_deinit();
 			return false;
 		}

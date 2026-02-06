@@ -265,6 +265,7 @@ typedef struct ip_cache
 } ip_cache;
 
 ip_cache_item *ipcacheTouch(ip_cache *ipcache, const struct in_addr *a4, const struct in6_addr *a6, const char *iface);
+ip_cache_item *ipcacheFind(ip_cache *ipcache, const struct in_addr *a4, const struct in6_addr *a6, const char *iface);
 void ipcachePurgeRateLimited(ip_cache *ipcache, time_t lifetime);
 void ipcacheDestroy(ip_cache *ipcache);
 void ipcachePrint(ip_cache *ipcache);

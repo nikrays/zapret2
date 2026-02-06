@@ -44,7 +44,7 @@ t_l7proto l7proto_from_name(const char *name)
 }
 bool l7_proto_match(t_l7proto l7proto, uint64_t filter_l7)
 {
-	return filter_l7==L7_ALL || (filter_l7 & (1<<l7proto)) || (filter_l7 & (1<<L7_KNOWN)) && l7proto>L7_KNOWN && l7proto<L7_LAST;
+	return filter_l7==L7_ALL || (filter_l7 & (1ULL<<l7proto)) || (filter_l7 & (1ULL<<L7_KNOWN)) && l7proto>L7_KNOWN && l7proto<L7_LAST;
 }
 
 static const char *l7payload_name[] = {
@@ -73,7 +73,7 @@ const char *l7payload_str(t_l7payload l7)
 }
 bool l7_payload_match(t_l7payload l7payload, uint64_t filter_l7p)
 {
-	return filter_l7p==L7P_ALL || (filter_l7p & (1<<l7payload)) || (filter_l7p & (1<<L7P_KNOWN)) && l7payload>L7P_KNOWN && l7payload<L7P_LAST;
+	return filter_l7p==L7P_ALL || (filter_l7p & (1ULL<<l7payload)) || (filter_l7p & (1ULL<<L7P_KNOWN)) && l7payload>L7P_KNOWN && l7payload<L7P_LAST;
 }
 bool l7_payload_str_list(uint64_t l7p, char *buf, size_t size)
 {
@@ -91,7 +91,7 @@ bool l7_payload_str_list(uint64_t l7p, char *buf, size_t size)
 	}
 	for(pl=0, p=buf, e=p+size, *buf=0 ; pl<L7P_LAST ; pl++)
 	{
-		if (l7p & (1<<pl))
+		if (l7p & (1ULL<<pl))
 		{
 			pstr = l7payload_str(pl);
 			lstr = strlen(pstr);
@@ -1351,6 +1351,7 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 	offset += 1 + data[offset];
 
 	// token length
+	if (offset>=len || (offset + tvb_get_size(data[offset])) > len) return false;
 	offset += tvb_get_varint(data + offset, &sz);
 	offset += sz;
 	if (offset >= len) return false;

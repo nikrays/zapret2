@@ -18,6 +18,7 @@ bool pf_parse(const char *s, port_filter *pf)
 	if (*s=='*' && s[1]==0)
 	{
 		pf->from=1; pf->to=0xFFFF;
+		pf->neg=false;
 		return true;
 	}
 	if (*s=='~')

@@ -730,7 +730,7 @@ static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr
 	if (!params.cache_hostname)
 	{
 		*hostname = 0;
-		return true;
+		return false;
 	}
 	if (params.debug)
 	{
@@ -738,13 +738,8 @@ static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr
 		ntopa46(a4, a6, s, sizeof(s));
 		DLOG("ipcache hostname search for %s\n", s);
 	}
-	ip_cache_item *ipc = ipcacheTouch(&params.ipcache, a4, a6, NULL);
-	if (!ipc)
-	{
-		DLOG_ERR("ipcache_get_hostname: out of memory\n");
-		return false;
-	}
-	if (ipc->hostname)
+	ip_cache_item *ipc = ipcacheFind(&params.ipcache, a4, a6, NULL);
+	if (ipc && ipc->hostname)
 	{
 		if (params.debug)
 		{
@@ -757,31 +752,36 @@ static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr
 	}
 	else
 		*hostname = 0;
-	return true;
+	return *hostname;
 }
 static void ipcache_update_ttl(t_ctrack *ctrack, const struct in_addr *a4, const struct in6_addr *a6, const char *iface)
 {
 	// no need to cache ttl in server mode because first packet is incoming
 	if (ctrack && !params.server)
 	{
-		ip_cache_item *ipc = ipcacheTouch(&params.ipcache, a4, a6, iface);
-		if (!ipc)
-		{
-			DLOG_ERR("ipcache: out of memory\n");
-			return;
-		}
+		ip_cache_item *ipc;
 		if (ctrack->incoming_ttl)
 		{
+			ipc = ipcacheTouch(&params.ipcache, a4, a6, iface);
+			if (!ipc)
+			{
+				DLOG_ERR("ipcache: out of memory\n");
+				return;
+			}
 			if (ipc->ttl != ctrack->incoming_ttl)
 			{
 				DLOG("updated ttl cache\n");
 				ipc->ttl = ctrack->incoming_ttl;
 			}
 		}
-		else if (ipc->ttl)
+		else
 		{
-			DLOG("got cached ttl %u\n", ipc->ttl);
-			ctrack->incoming_ttl = ipc->ttl;
+			ipc = ipcacheFind(&params.ipcache, a4, a6, iface);
+			if (ipc && ipc->ttl)
+			{
+				DLOG("got cached ttl %u\n", ipc->ttl);
+				ctrack->incoming_ttl = ipc->ttl;
+			}
 		}
 	}
 }
@@ -790,10 +790,8 @@ static void ipcache_get_ttl(t_ctrack *ctrack, const struct in_addr *a4, const st
 	// no need to cache ttl in server mode because first packet is incoming
 	if (ctrack && !ctrack->incoming_ttl && !params.server)
 	{
-		ip_cache_item *ipc = ipcacheTouch(&params.ipcache, a4, a6, iface);
-		if (!ipc)
-			DLOG_ERR("ipcache: out of memory\n");
-		else if (ipc->ttl)
+		ip_cache_item *ipc = ipcacheFind(&params.ipcache, a4, a6, iface);
+		if (ipc && ipc->ttl)
 		{
 			DLOG("got cached ttl %u\n", ipc->ttl);
 			ctrack->incoming_ttl = ipc->ttl;
@@ -897,7 +895,7 @@ static uint8_t desync(
 	if (LIST_FIRST(&dp->lua_desync))
 	{
 		lua_rawgeti(params.L, LUA_REGISTRYINDEX, params.ref_desync_ctx);
-		t_lua_desync_context *ctx = (t_lua_desync_context *)luaL_checkudata(params.L, 1, "desync_ctx");
+		t_lua_desync_context *ctx = (t_lua_desync_context *)luaL_checkudata(params.L, -1, "desync_ctx");
 		// this is singleton stored in the registry. safe to pop
 		lua_pop(params.L,1);
 
@@ -1264,7 +1262,7 @@ static bool play_prolog(
 				hostname_is_ip = ps->ctrack->hostname_is_ip;
 				if (!hostname && !ps->bReverse)
 				{
-					if (ipcache_get_hostname(ps->sdip4, ps->sdip6, ps->host, sizeof(ps->host), &hostname_is_ip) && *ps->host)
+					if (ipcache_get_hostname(ps->sdip4, ps->sdip6, ps->host, sizeof(ps->host), &hostname_is_ip))
 						if (!(hostname = ps->ctrack->hostname = strdup(ps->host)))
 							DLOG_ERR("strdup(host): out of memory\n");
 				}
@@ -1985,8 +1983,8 @@ static uint8_t dpi_desync_icmp_packet(
 			hostname = ctrack->hostname;
 			hostname_is_ip = ctrack->hostname_is_ip;
 		}
-		else if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL, dis->ip6 ? &dis->ip6->ip6_dst : NULL, host, sizeof(host), &hostname_is_ip) && *host ||
-			ipcache_get_hostname(dis->ip ? &dis->ip->ip_src : NULL, dis->ip6 ? &dis->ip6->ip6_src : NULL, host, sizeof(host), &hostname_is_ip) && *host)
+		else if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL, dis->ip6 ? &dis->ip6->ip6_dst : NULL, host, sizeof(host), &hostname_is_ip) ||
+			ipcache_get_hostname(dis->ip ? &dis->ip->ip_src : NULL, dis->ip6 ? &dis->ip6->ip6_src : NULL, host, sizeof(host), &hostname_is_ip))
 		{
 			hostname = host;
 		}
@@ -2052,8 +2050,8 @@ static uint8_t dpi_desync_ip_packet(
 	bool hostname_is_ip = false;
 	const char *hostname = NULL;
 	char host[256];
-	if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL, dis->ip6 ? &dis->ip6->ip6_dst : NULL, host, sizeof(host), &hostname_is_ip) && *host ||
-		ipcache_get_hostname(dis->ip ? &dis->ip->ip_src : NULL, dis->ip6 ? &dis->ip6->ip6_src : NULL, host, sizeof(host), &hostname_is_ip) && *host)
+	if (ipcache_get_hostname(dis->ip ? &dis->ip->ip_dst : NULL, dis->ip6 ? &dis->ip6->ip6_dst : NULL, host, sizeof(host), &hostname_is_ip) ||
+		ipcache_get_hostname(dis->ip ? &dis->ip->ip_src : NULL, dis->ip6 ? &dis->ip6->ip6_src : NULL, host, sizeof(host), &hostname_is_ip))
 	{
 		hostname = host;
 	}
