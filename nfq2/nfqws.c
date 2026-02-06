@@ -156,9 +156,10 @@ static uint8_t processPacketData(uint32_t *mark, const char *ifin, const char *i
 	return dpi_desync_packet(*mark, ifin, ifout, data_pkt, len_pkt, mod_pkt, len_mod_pkt);
 }
 
+#define FUZZ_MAX_PACKET_SIZE (RECONSTRUCT_MAX_SIZE+4096)
 static void fuzzPacketData(unsigned int count)
 {
-	uint8_t packet[RECONSTRUCT_MAX_SIZE],mod[RECONSTRUCT_MAX_SIZE];
+	uint8_t *packet,mod[RECONSTRUCT_MAX_SIZE+4096];
 	size_t len, modlen;
 	unsigned int k;
 	uint32_t mark=0;
@@ -168,15 +169,17 @@ static void fuzzPacketData(unsigned int count)
 	{
 		if (bQuit) break;
 		if (!(k%1000)) DLOG_CONDUP("fuzz ct=%u\n",k);
-		len = random()%sizeof(packet);
+		len = random()%(FUZZ_MAX_PACKET_SIZE+1);
+		packet = malloc(len); // alloc every time to catch uninitialized reads
 		fill_random_bytes(packet,len);
 		if (len)
 		{
 			// simulate ipv4 or ipv6 and invalid packet with low probability
 			*packet = *packet ? (*packet & 1) ? 0x40 : 0x60 | (*packet & 0x0F) : (uint8_t)random();
 		}
-		modlen = sizeof(mod);
+		modlen = random()%(sizeof(mod)+1);
 		verdict = processPacketData(&mark,random()%1 ? "ifin" : NULL,random()%1 ? "ifout" : NULL,packet,len,mod,&modlen);
+		free(packet);
 	}
 }
 static void do_fuzz(void)
