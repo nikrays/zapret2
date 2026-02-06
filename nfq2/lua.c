@@ -3687,7 +3687,7 @@ static int luacall_timelocal(lua_State *L)
 {
 	// timelocal(tm)
 	lua_check_argc(L,"timelocal",1);
-	lua_timex(L, timelocal);
+	lua_timex(L, mktime);
 	return 1;
 }
 static int luacall_timegm(lua_State *L)
