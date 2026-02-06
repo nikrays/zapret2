@@ -796,7 +796,8 @@ static int win_main()
 				}
 				else if (errno == ENODEV)
 				{
-					DLOG_CONDUP("logical network disappeared. deinitializing windivert.\n");
+					DLOG_CONDUP("\nlogical network disappeared. deinitializing windivert.\n");
+					rawsend_cleanup();
 					break;
 				}
 				else if (errno == EINTR)

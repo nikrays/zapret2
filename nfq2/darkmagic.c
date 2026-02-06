@@ -1152,6 +1152,42 @@ static bool AdapterID2Name(const GUID *guid,char *name,DWORD name_len)
 	return bRet;
 }
 
+
+typedef DWORD (WINAPI *t_WlanOpenHandle)(
+  DWORD dwClientVersion,
+  PVOID pReserved,
+  PDWORD pdwNegotiatedVersion,
+  PHANDLE phClientHandle
+);
+typedef DWORD (WINAPI *t_WlanCloseHandle)(
+  HANDLE hClientHandle,
+  PVOID pReserved
+);
+typedef DWORD (WINAPI *t_WlanEnumInterfaces)(
+  HANDLE hClientHandle,
+  PVOID pReserved,
+  PWLAN_INTERFACE_INFO_LIST *ppInterfaceList
+);
+typedef DWORD (WINAPI *t_WlanQueryInterface)(
+  HANDLE hClientHandle,
+  const GUID *pInterfaceGuid,
+  WLAN_INTF_OPCODE OpCode,
+  PVOID pReserved,
+  PDWORD pdwDataSize,
+  PVOID *ppData,
+  PWLAN_OPCODE_VALUE_TYPE pWlanOpcodeValueType
+);
+typedef DWORD (WINAPI *t_WlanFreeMemory)(
+  PVOID pMemory
+);
+
+t_WlanOpenHandle f_WlanOpenHandle = NULL;
+t_WlanCloseHandle f_WlanCloseHandle = NULL;
+t_WlanEnumInterfaces f_WlanEnumInterfaces = NULL;
+t_WlanQueryInterface f_WlanQueryInterface = NULL;
+t_WlanFreeMemory f_WlanFreeMemory = NULL;
+HMODULE hdll_wlanapi = NULL;
+
 bool win_dark_init(const struct str_list_head *ssid_filter, const struct str_list_head *nlm_filter)
 {
 	win_dark_deinit();
@@ -1165,12 +1201,38 @@ bool win_dark_init(const struct str_list_head *ssid_filter, const struct str_lis
 			if (FAILED(w_win32_error = CoCreateInstance(&CLSID_NetworkListManager, NULL, CLSCTX_ALL, &IID_INetworkListManager, (LPVOID*)&pNetworkListManager)))
 			{
 				CoUninitialize();
+				DLOG_ERR("could not create CLSID_NetworkListManager. win32 error %u\n", w_win32_error);
 				return false;
 			}
 		}
 		else
 			return false;
 	}
+	if (ssid_filter)
+	{
+		// dont load any crap from current dir
+		hdll_wlanapi = LoadLibraryExW(L"wlanapi.dll",NULL,LOAD_LIBRARY_SEARCH_SYSTEM32);
+		if (!hdll_wlanapi)
+		{
+			w_win32_error = GetLastError();
+			DLOG_ERR("could not load wlanapi.dll. win32 error %u\n", w_win32_error);
+			win_dark_deinit();
+			return false;
+		}
+		f_WlanOpenHandle = (t_WlanOpenHandle)GetProcAddress(hdll_wlanapi,"WlanOpenHandle");
+		f_WlanCloseHandle = (t_WlanCloseHandle)GetProcAddress(hdll_wlanapi,"WlanCloseHandle");
+		f_WlanEnumInterfaces = (t_WlanEnumInterfaces)GetProcAddress(hdll_wlanapi,"WlanEnumInterfaces");
+		f_WlanQueryInterface = (t_WlanQueryInterface)GetProcAddress(hdll_wlanapi,"WlanQueryInterface");
+		f_WlanFreeMemory = (t_WlanFreeMemory)GetProcAddress(hdll_wlanapi,"WlanFreeMemory");
+		if (!f_WlanOpenHandle || !f_WlanCloseHandle || !f_WlanEnumInterfaces || !f_WlanQueryInterface || !f_WlanFreeMemory)
+		{
+			w_win32_error = GetLastError();
+			DLOG_ERR("could not import required functions from wlanapi.dll\n");
+			win_dark_deinit();
+			return false;
+		}
+	}
+
 	nlm_filter_net = nlm_filter;
 	wlan_filter_ssid = ssid_filter;
 	return true;
@@ -1184,6 +1246,16 @@ void win_dark_deinit(void)
 	}
 	if (nlm_filter_net) CoUninitialize();
 	wlan_filter_ssid = nlm_filter_net = NULL;
+	if (hdll_wlanapi)
+	{
+		FreeLibrary(hdll_wlanapi);
+		hdll_wlanapi = NULL;
+		f_WlanOpenHandle = NULL;
+		f_WlanCloseHandle = NULL;
+		f_WlanEnumInterfaces = NULL;
+		f_WlanQueryInterface = NULL;
+		f_WlanFreeMemory = NULL;
+	}
 }
 
 
@@ -1365,16 +1437,16 @@ static bool wlan_filter_match(const struct str_list_head *ssid_list)
 		return true;
 	}
 
-	w_win32_error = WlanOpenHandle(2, NULL, &dwCurVersion, &hClient);
+	w_win32_error = f_WlanOpenHandle(2, NULL, &dwCurVersion, &hClient);
 	if (w_win32_error != ERROR_SUCCESS) goto fail;
-	w_win32_error = WlanEnumInterfaces(hClient, NULL, &pIfList);
+	w_win32_error = f_WlanEnumInterfaces(hClient, NULL, &pIfList);
 	if (w_win32_error != ERROR_SUCCESS) goto fail;
 	for (k = 0; k < pIfList->dwNumberOfItems; k++)
 	{
 		pIfInfo = pIfList->InterfaceInfo + k;
 		if (pIfInfo->isState == wlan_interface_state_connected)
 		{
-			w_win32_error = WlanQueryInterface(hClient,
+			w_win32_error = f_WlanQueryInterface(hClient,
 				&pIfInfo->InterfaceGuid,
 				wlan_intf_opcode_current_connection,
 				NULL,
@@ -1390,20 +1462,20 @@ static bool wlan_filter_match(const struct str_list_head *ssid_list)
 				len = strlen(ssid->str);
 				if (len==pConnectInfo->wlanAssociationAttributes.dot11Ssid.uSSIDLength && !memcmp(ssid->str,pConnectInfo->wlanAssociationAttributes.dot11Ssid.ucSSID,len))
 				{	
-					WlanFreeMemory(pConnectInfo);
+					f_WlanFreeMemory(pConnectInfo);
 					goto found;
 				}
 			}
 
-			WlanFreeMemory(pConnectInfo);
+			f_WlanFreeMemory(pConnectInfo);
 		}
 	}
 	w_win32_error = 0;
 fail:
 	bRes = false;
 ex:
-	if (pIfList) WlanFreeMemory(pIfList);
-	if (hClient) WlanCloseHandle(hClient, 0);
+	if (pIfList) f_WlanFreeMemory(pIfList);
+	if (hClient) f_WlanCloseHandle(hClient, 0);
 	return bRes;
 found:
 	w_win32_error = 0;
