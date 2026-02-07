@@ -2442,7 +2442,7 @@ bool lua_reconstruct_dissect(lua_State *L, int idx, uint8_t *buf, size_t *len, b
 		{
 			if (lpayload>0xFFFF)
 			{
-				DLOG_ERR("reconstruct_dissect: invalid payload length\n");
+				DLOG_ERR("reconstruct_dissect: payload too large : %zu\n",lpayload);
 				goto err;
 			}
 			if (left<lpayload)
@@ -2511,7 +2511,7 @@ bool lua_reconstruct_dissect(lua_State *L, int idx, uint8_t *buf, size_t *len, b
 		{
 			if (lpayload>0xFFFF)
 			{
-				DLOG_ERR("reconstruct_dissect: invalid payload length\n");
+				DLOG_ERR("reconstruct_dissect: payload too large : %zu\n",lpayload);
 				goto err;
 			}
 			if (left<lpayload)
