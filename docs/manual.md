@@ -2247,7 +2247,7 @@ function dissect(raw_ip)
 function reconstruct_dissect(dissect[, reconstruct_opts])
 ```
 
-Возвращает raw_ip. Все чексуммы считаются автоматически. L4 чексуммы портятся, если задан badsum в reconstruct_opts.
+Возвращает raw_ip. Все чексуммы считаются автоматически. L4 чексуммы портятся, если задан badsum в [reconstruct_opts](#standard-reconstruct).
 
 Реконструкция диссектов с IP фрагментацией происходит особым образом. Есть 2 варианта.
 
