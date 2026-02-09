@@ -407,7 +407,7 @@ function cond_payload_str(desync)
 end
 -- true if dissect is tcp and timestamp tcp option is present
 function cond_tcp_has_ts(desync)
-	return desync.dis.tcp and find_tcp_option(desync.dis.tcp.options, TCP_KIND_TS+11)
+	return desync.dis.tcp and find_tcp_option(desync.dis.tcp.options, TCP_KIND_TS)
 end
 
 -- check iff function available. error if not
@@ -449,13 +449,14 @@ function per_instance_condition(ctx, desync)
 			if type(_G[instance.arg.cond])~="function" then
 				error(name..": invalid 'iff' function '"..instance.arg.cond.."'")
 			end
-			if not logical_xor(_G[instance.arg.cond](desync), instance.arg.cond_neg) then
-				DLOG("per_instance_condition: condition not satisfied. skipping "..instance.func_instance)
-				goto continue
+			if logical_xor(_G[instance.arg.cond](desync), instance.arg.cond_neg) then
+				verdict = plan_instance_execute(desync, verdict, instance)
+			else
+				DLOG("per_instance_condition: condition not satisfied. skipping '"..instance.func_instance.."'")
 			end
+		else
+			DLOG("per_instance_condition: no 'cond' arg in '"..instance.func_instance.."'. skipping")
 		end
-		verdict = plan_instance_execute(desync, verdict, instance)
-		::continue::
 	end
 	return verdict
 end
