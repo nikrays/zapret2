@@ -514,22 +514,17 @@ ssize_t read_intr(int fd, void *buf, size_t count)
 
 size_t fread_safe(void *ptr, size_t size, size_t nmemb, FILE *F)
 {
-	size_t total_read = 0;
+	size_t result, total_read = 0;
 	while (total_read < nmemb)
 	{
-		size_t result = fread((uint8_t*)ptr + (total_read * size), size, nmemb - total_read, F);
+		total_read += (result = fread((uint8_t*)ptr + (total_read * size), size, nmemb - total_read, F));
 		if (result < (nmemb - total_read))
 		{
 			if (errno == EINTR)
-			{
 				clearerr(F);
-				total_read += result;
-				continue;
-			}
-			total_read += result;
-			break;
+			else
+				break;
 		}
-		total_read += result;
 	}
 	return total_read;
 }
