@@ -109,10 +109,6 @@ bool set_env_exedir(const char *argv0);
 
 bool parse_int16(const char *p, int16_t *v);
 
-uint32_t mask_from_bitcount(uint32_t zct);
-void mask_from_bitcount6_prepare(void);
-const struct in6_addr *mask_from_bitcount6(uint32_t zct);
-
 #ifdef CLOCK_BOOTTIME
 #define CLOCK_BOOT_OR_UPTIME CLOCK_BOOTTIME
 #elif defined(CLOCK_UPTIME)
@@ -122,3 +118,9 @@ const struct in6_addr *mask_from_bitcount6(uint32_t zct);
 #endif
 
 time_t boottime(void);
+
+#ifdef __CYGWIN__
+uint32_t mask_from_bitcount(uint32_t zct);
+void mask_from_bitcount6_prepare(void);
+const struct in6_addr *mask_from_bitcount6(uint32_t zct);
+#endif

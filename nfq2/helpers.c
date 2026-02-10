@@ -666,6 +666,15 @@ bool parse_int16(const char *p, int16_t *v)
 	return false;
 }
 
+
+time_t boottime(void)
+{
+	struct timespec ts;
+	return clock_gettime(CLOCK_BOOT_OR_UPTIME, &ts) ? 0 : ts.tv_sec;
+}
+
+
+#ifdef __CYGWIN__
 uint32_t mask_from_bitcount(uint32_t zct)
 {
 	return zct < 32 ? ~((1u << zct) - 1) : 0;
@@ -691,9 +700,4 @@ const struct in6_addr *mask_from_bitcount6(uint32_t zct)
 {
 	return ip6_mask + zct;
 }
-
-time_t boottime(void)
-{
-	struct timespec ts;
-	return clock_gettime(CLOCK_BOOT_OR_UPTIME, &ts) ? 0 : ts.tv_sec;
-}
+#endif
