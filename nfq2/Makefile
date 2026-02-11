@@ -6,7 +6,7 @@ CFLAGS_LINUX = -Wno-alloc-size-larger-than
 CFLAGS_SYSTEMD = -DUSE_SYSTEMD
 CFLAGS_BSD = -Wno-address-of-packed-member
 CFLAGS_CYGWIN = -Wno-address-of-packed-member -static
-CFLAGS_CYGWIN32 = -msse2 -mfpmath=sse
+CFLAGS_CYGWIN32 =
 CFLAGS_UBSAN = -fsanitize=undefined,alignment -fno-sanitize-recover=undefined,alignment
 LDFLAGS_ANDROID = -llog
 LIBS =
@@ -28,6 +28,7 @@ ifeq ($(LUA_JIT),1)
 LUAJIT_VER?=2.1
 LUAJIT_LUA_VER?=5.1
 LUA_PKG:=luajit
+CFLAGS_CYGWIN32 = -msse2 -mfpmath=sse
 
 $(info trying luajit $(LUAJIT_VER) lua $(LUAJIT_LUA_VER))
 
