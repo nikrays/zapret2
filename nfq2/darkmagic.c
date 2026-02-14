@@ -1557,7 +1557,6 @@ void rawsend_cleanup(void)
 {
 	if (w_filter)
 	{
-		CancelIoEx(w_filter,&ovl);
 		WinDivertClose(w_filter);
 		w_filter=NULL;
 	}
@@ -1585,71 +1584,71 @@ bool windivert_init(const char *filter)
 	return false;
 }
 
-static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa, unsigned int *wa_count)
+static bool windivert_recv_exit(void)
 {
-	UINT recv_len;
-	DWORD err;
-	DWORD rd;
-	char c;
+	sigset_t pending;
+
+	// make signals working
+	sigpending(&pending);
 
 	if (bQuit)
 	{
 		errno=EINTR;
-		return false;
+		return true;
 	}
 	if (!logical_net_filter_match_rate_limited())
 	{
 		errno=ENODEV;
-		return false;
+		return true;
 	}
-	usleep(0);
+	return false;
+}
+static bool windivert_recv_filter(HANDLE hFilter, uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa, unsigned int *wa_count)
+{
+	UINT recv_len;
+	DWORD rd;
+	unsigned int wac;
 
-	*wa_count *= sizeof(WINDIVERT_ADDRESS);
-	if (WinDivertRecvEx(hFilter, packet, *len, &recv_len, 0, wa, wa_count, &ovl))
+	if (windivert_recv_exit()) return false;
+
+	wac = *wa_count * sizeof(WINDIVERT_ADDRESS);
+	if (WinDivertRecvEx(hFilter, packet, *len, &recv_len, 0, wa, &wac, &ovl))
 	{
-		*wa_count /= sizeof(WINDIVERT_ADDRESS);
+		*wa_count = wac/sizeof(WINDIVERT_ADDRESS);
 		*len = recv_len;
 		return true;
 	}
 
-	for(;;)
+	w_win32_error = GetLastError();
+	switch(w_win32_error)
 	{
-		w_win32_error = GetLastError();
-
-		switch(w_win32_error)
-		{
-			case ERROR_IO_PENDING:
-				// make signals working
-				while (WaitForSingleObject(ovl.hEvent,50)==WAIT_TIMEOUT)
-				{
-					if (bQuit)
-					{
-						errno=EINTR;
-						return false;
-					}
-					if (!logical_net_filter_match_rate_limited())
-					{
-						errno=ENODEV;
-						return false;
-					}
-					usleep(0);
-				}
-				if (!GetOverlappedResult(hFilter,&ovl,&rd,TRUE))
-					continue;
-				*wa_count /= sizeof(WINDIVERT_ADDRESS);
-				*len = rd;
-				return true;
-			case ERROR_INSUFFICIENT_BUFFER:
-				errno = ENOBUFS;
-				break;
-			case ERROR_NO_DATA:
-				errno = ESHUTDOWN;
-				break;
-			default:
-				errno = EIO;
-		}
-		break;
+		case ERROR_IO_PENDING:
+			// make signals working
+			while (WaitForSingleObject(ovl.hEvent,50)==WAIT_TIMEOUT)
+			{
+				if (windivert_recv_exit()) return false;
+			}
+			if (!GetOverlappedResult(hFilter,&ovl,&rd,FALSE))
+			{
+				errno=EIO;
+				goto cancel;
+			}
+			*wa_count = wac/sizeof(WINDIVERT_ADDRESS);
+			*len = rd;
+			return true;
+		case ERROR_INSUFFICIENT_BUFFER:
+			errno = ENOBUFS;
+			break;
+		case ERROR_NO_DATA:
+			errno = ESHUTDOWN;
+			break;
+		default:
+			errno = EIO;
 	}
+cancel:
+	// make sure no pending operations
+	CancelIoEx(w_filter,&ovl);
+	GetOverlappedResult(hFilter, &ovl, &rd, TRUE);
 	return false;
 }
 bool windivert_recv(uint8_t *packet, size_t *len, WINDIVERT_ADDRESS *wa, unsigned int *wa_count)
