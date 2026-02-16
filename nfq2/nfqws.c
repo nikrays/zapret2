@@ -317,13 +317,29 @@ static bool nfq_init(struct nfq_handle **h, struct nfq_q_handle **qh, uint8_t *m
 		goto exiterr;
 	}
 
-	// linux kernels pass both ipv4 and ipv6 even if only AF_INET is boumd
 	// linux 3.8 - bind calls are NOOP.  linux 3.8- - secondary bind to AF_INET6 will fail
+	// old kernels seem to require both binds to ipv4 and ipv6. may not work without unbind
+
+	DLOG_CONDUP("unbinding existing nf_queue handler for AF_INET (if any)\n");
+	if (nfq_unbind_pf(*h, AF_INET) < 0) {
+		DLOG_PERROR("nfq_unbind_pf(AF_INET)");
+		goto exiterr;
+	}
 
 	DLOG_CONDUP("binding nfnetlink_queue as nf_queue handler for AF_INET\n");
 	if (nfq_bind_pf(*h, AF_INET) < 0) {
 		DLOG_PERROR("nfq_bind_pf(AF_INET)");
 		goto exiterr;
+	}
+
+	DLOG_CONDUP("unbinding existing nf_queue handler for AF_INET6 (if any)\n");
+	if (nfq_unbind_pf(*h, AF_INET6) < 0) {
+		DLOG_PERROR("nfq_unbind_pf(AF_INET6)");
+	}
+
+	DLOG_CONDUP("binding nfnetlink_queue as nf_queue handler for AF_INET6\n");
+	if (nfq_bind_pf(*h, AF_INET6) < 0) {
+		DLOG_PERROR("nfq_bind_pf(AF_INET6)");
 	}
 
 	DLOG_CONDUP("binding this socket to queue '%u'\n", params.qnum);

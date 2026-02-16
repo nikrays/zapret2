@@ -1880,8 +1880,9 @@ static int rawsend_socket(sa_family_t family)
 		}
 		if (family==AF_INET && setsockopt(*sock, IPPROTO_IP, IP_NODEFRAG, &yes, sizeof(yes)) == -1)
 		{
+			// since 2.6.36
 			DLOG_PERROR("rawsend: setsockopt(IP_NODEFRAG)");
-			goto exiterr;
+			//goto exiterr;
 		}
 		if (family==AF_INET && setsockopt(*sock, IPPROTO_IP, IP_FREEBIND, &yes, sizeof(yes)) == -1)
 		{
