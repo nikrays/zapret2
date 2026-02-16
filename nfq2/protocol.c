@@ -1198,12 +1198,13 @@ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, si
 	uint64_t payload_len,token_len,pn_offset;
 	pn_offset = 1 + 4 + 1 + data[5];
 	if (pn_offset >= data_len) return false;
+	// SCID length
 	pn_offset += 1 + data[pn_offset];
-	if ((pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
+	if (pn_offset >= data_len || (pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
+	// token length
 	pn_offset += tvb_get_varint(data + pn_offset, &token_len);
 	pn_offset += token_len;
-	if (pn_offset >= data_len) return false;
-	if ((pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
+	if (pn_offset >= data_len || (pn_offset + tvb_get_size(data[pn_offset])) >= data_len) return false;
 	pn_offset += tvb_get_varint(data + pn_offset, &payload_len);
 	if (payload_len<20 || (pn_offset + payload_len)>data_len) return false;
 

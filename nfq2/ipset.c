@@ -182,7 +182,7 @@ bool LoadAllIpsets()
 
 static bool SearchIpset(const ipset *ips, const struct in_addr *ipv4, const struct in6_addr *ipv6)
 {
-	char s_ip[40];
+	char s_ip[INET6_ADDRSTRLEN];
 	bool bInSet=false;
 
 	if (!!ipv4 != !!ipv6)

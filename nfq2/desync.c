@@ -289,11 +289,11 @@ static struct desync_profile *dp_find(
 	struct desync_profile_list *dpl;
 	if (params.debug)
 	{
-		char s[40];
+		char s[INET6_ADDRSTRLEN];
 		ntopa46(ip, ip6, s, sizeof(s));
 		if (ipr || ipr6)
 		{
-			char sr[40];
+			char sr[INET6_ADDRSTRLEN];
 			ntopa46(ipr, ipr6, sr, sizeof(sr));
 			DLOG("desync profile search for %s ip1=%s ip2=%s port=%u icmp=%u:%u l7proto=%s ssid='%s' hostname='%s'\n",
 				proto_name(l3proto), s, sr, port, icmp_type, icmp_code, l7proto_str(l7proto), ssid ? ssid : "", hostname ? hostname : "");
@@ -737,7 +737,7 @@ static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr
 	}
 	if (params.debug)
 	{
-		char s[40];
+		char s[INET6_ADDRSTRLEN];
 		ntopa46(a4, a6, s, sizeof(s));
 		DLOG("ipcache hostname search for %s\n", s);
 	}
@@ -746,7 +746,7 @@ static bool ipcache_get_hostname(const struct in_addr *a4, const struct in6_addr
 	{
 		if (params.debug)
 		{
-			char s[40];
+			char s[INET6_ADDRSTRLEN];
 			ntopa46(a4, a6, s, sizeof(s));
 			DLOG("got cached hostname for %s : %s (is_ip=%u)\n", s, ipc->hostname, ipc->hostname_is_ip);
 		}
@@ -1137,7 +1137,7 @@ static void setup_direction(
 
 	if (params.debug)
 	{
-		char ip[40];
+		char ip[INET6_ADDRSTRLEN];
 		ntopa46(*sdip4, *sdip6, ip, sizeof(ip));
 		DLOG("%s mode desync profile/ipcache search target ip=%s port=%u\n", params.server ? "server" : "client", ip, *sdport);
 	}
@@ -1676,7 +1676,7 @@ static bool feed_dns_response(const uint8_t *a, size_t len)
 
 	// check of minimum header length and response flag
 	uint16_t k, off, dlen, qcount = a[4]<<8 | a[5], acount = a[6]<<8 | a[7];
-	char s_ip[40];
+	char s_ip[INET6_ADDRSTRLEN];
 	const uint8_t *b = a, *p;
 	const uint8_t *e = b + len;
 	size_t nl;

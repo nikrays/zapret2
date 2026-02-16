@@ -347,7 +347,7 @@ void ConntrackPoolDump(const t_conntrack *p)
 {
 	t_conntrack_pool *t, *tmp;
 	time_t tnow;
-	char sa1[40], sa2[40];
+	char sa1[INET6_ADDRSTRLEN], sa2[INET6_ADDRSTRLEN];
 
 	if (!(tnow=boottime())) return;
 	HASH_ITER(hh, p->pool, t, tmp) {

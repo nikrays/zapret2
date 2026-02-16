@@ -246,7 +246,7 @@ void ntop46(const struct sockaddr *sa, char *str, size_t len)
 }
 void ntop46_port(const struct sockaddr *sa, char *str, size_t len)
 {
-	char ip[40];
+	char ip[INET6_ADDRSTRLEN];
 	ntop46(sa, ip, sizeof(ip));
 	switch (sa->sa_family)
 	{

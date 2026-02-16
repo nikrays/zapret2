@@ -1033,7 +1033,7 @@ static ip_cache4 *ipcache4Add(ip_cache4 **ipcache, const struct in_addr *a, cons
 }
 static void ipcache4Print(ip_cache4 *ipcache)
 {
-	char s_ip[16];
+	char s_ip[INET_ADDRSTRLEN];
 	time_t now;
 	ip_cache4 *ipc, *tmp;
 
@@ -1091,7 +1091,7 @@ static ip_cache6 *ipcache6Add(ip_cache6 **ipcache, const struct in6_addr *a, con
 }
 static void ipcache6Print(ip_cache6 *ipcache)
 {
-	char s_ip[40];
+	char s_ip[INET6_ADDRSTRLEN];
 	time_t now;
 	ip_cache6 *ipc, *tmp;
 

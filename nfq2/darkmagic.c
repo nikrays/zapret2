@@ -285,7 +285,7 @@ void str_icmp_type_name(char *s, size_t s_len, bool v6, uint8_t type)
 
 static void str_srcdst_ip(char *s, size_t s_len, const void *saddr,const void *daddr)
 {
-	char s_ip[16],d_ip[16];
+	char s_ip[INET_ADDRSTRLEN],d_ip[INET_ADDRSTRLEN];
 	*s_ip=*d_ip=0;
 	inet_ntop(AF_INET, saddr, s_ip, sizeof(s_ip));
 	inet_ntop(AF_INET, daddr, d_ip, sizeof(d_ip));
@@ -306,7 +306,7 @@ void print_ip(const struct ip *ip)
 }
 void str_srcdst_ip6(char *s, size_t s_len, const void *saddr,const void *daddr)
 {
-	char s_ip[40],d_ip[40];
+	char s_ip[INET6_ADDRSTRLEN],d_ip[INET6_ADDRSTRLEN];
 	*s_ip=*d_ip=0;
 	inet_ntop(AF_INET6, saddr, s_ip, sizeof(s_ip));
 	inet_ntop(AF_INET6, daddr, d_ip, sizeof(d_ip));
@@ -314,14 +314,14 @@ void str_srcdst_ip6(char *s, size_t s_len, const void *saddr,const void *daddr)
 }
 void str_ip6hdr(char *s, size_t s_len, const struct ip6_hdr *ip6hdr, uint8_t proto)
 {
-	char ss[83],s_proto[16];
+	char ss[100],s_proto[16];
 	str_srcdst_ip6(ss,sizeof(ss),&ip6hdr->ip6_src,&ip6hdr->ip6_dst);
 	str_proto_name(s_proto,sizeof(s_proto),proto);
 	snprintf(s,s_len,"%s proto=%s ttl=%u",ss,s_proto,ip6hdr->ip6_hlim);
 }
 void print_ip6hdr(const struct ip6_hdr *ip6hdr, uint8_t proto)
 {
-	char s[128];
+	char s[132];
 	str_ip6hdr(s,sizeof(s),ip6hdr,proto);
 	printf("%s",s);
 }

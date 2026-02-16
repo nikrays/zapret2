@@ -2813,7 +2813,7 @@ static int luacall_ntop(lua_State *L)
 {
 	size_t l;
 	const char *p;
-	char s[40];
+	char s[INET6_ADDRSTRLEN];
 	int af=0;
 
 	lua_check_argc(L,"ntop",1);
@@ -2833,9 +2833,10 @@ static int luacall_ntop(lua_State *L)
 			lua_pushnil(L);
 			return 1;
 	}
-	if (!inet_ntop(af,p,s,sizeof(s)))
-		luaL_error(L, "inet_ntop error");
-	lua_pushstring(L,s);
+	if (inet_ntop(af,p,s,sizeof(s)))
+		lua_pushstring(L,s);
+	else
+		lua_pushnil(L);
 
 	LUA_STACK_GUARD_RETURN(L,1)
 }
@@ -3139,7 +3140,7 @@ static int lua_get_ifaddrs(lua_State *L)
 	struct ifreq ifr;
 	const char *ifname;
 #ifdef __CYGWIN__
-	char ifname_buf[16];
+	char ifname_buf[IFNAMSIZ];
 #endif
 	memset(&ifr,0,sizeof(ifr));
 

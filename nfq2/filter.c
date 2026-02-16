@@ -173,7 +173,7 @@ bool packet_range_parse(const char *s, struct packet_range *range)
 
 void str_cidr4(char *s, size_t s_len, const struct cidr4 *cidr)
 {
-	char s_ip[16];
+	char s_ip[INET_ADDRSTRLEN];
 	*s_ip=0;
 	inet_ntop(AF_INET, &cidr->addr, s_ip, sizeof(s_ip));
 	snprintf(s,s_len,cidr->preflen<32 ? "%s/%u" : "%s", s_ip, cidr->preflen);
@@ -186,14 +186,14 @@ void print_cidr4(const struct cidr4 *cidr)
 }
 void str_cidr6(char *s, size_t s_len, const struct cidr6 *cidr)
 {
-	char s_ip[40];
+	char s_ip[INET6_ADDRSTRLEN];
 	*s_ip=0;
 	inet_ntop(AF_INET6, &cidr->addr, s_ip, sizeof(s_ip));
 	snprintf(s,s_len,cidr->preflen<128 ? "%s/%u" : "%s", s_ip, cidr->preflen);
 }
 void print_cidr6(const struct cidr6 *cidr)
 {
-	char s[44];
+	char s[INET_ADDRSTRLEN+4];
 	str_cidr6(s,sizeof(s),cidr);
 	printf("%s",s);
 }
