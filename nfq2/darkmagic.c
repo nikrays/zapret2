@@ -562,6 +562,7 @@ void proto_dissect_l3l4(const uint8_t *data, size_t len, struct dissect *dis, bo
 		dis->ip = (const struct ip *) data;
 		dis->proto = dis->ip->ip_p;
 		p = data;
+		dis->len_pkt = len = ntohs(((struct ip*)data)->ip_len);
 		proto_skip_ipv4(&data, &len, &dis->frag, &dis->frag_off);
 		dis->len_l3 = data-p;
 	}
@@ -569,6 +570,7 @@ void proto_dissect_l3l4(const uint8_t *data, size_t len, struct dissect *dis, bo
 	{
 		dis->ip6 = (const struct ip6_hdr *) data;
 		p = data;
+		dis->len_pkt = len = ntohs(((struct ip6_hdr*)data)->ip6_ctlun.ip6_un1.ip6_un1_plen) + sizeof(struct ip6_hdr);
 		proto_skip_ipv6(&data, &len, &dis->proto, &dis->frag, &dis->frag_off);
 		dis->len_l3 = data-p;
 	}
