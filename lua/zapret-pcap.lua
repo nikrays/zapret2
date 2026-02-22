@@ -34,6 +34,7 @@ function pcap(ctx, desync)
 	if not f then
 		error("pcap: could not write to '".._G[fn_cache_name].."'")
 	end
-	pcap_write(f, raw_packet(ctx))
+	local raw = ctx and raw_packet(ctx) or reconstruct_dissect(desync.dis)
+	pcap_write(f, raw)
 	f:close()
 end
