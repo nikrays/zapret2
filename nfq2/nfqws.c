@@ -266,6 +266,10 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	mark = nfq_get_nfmark(nfa);
 	ilen = nfq_get_payload(nfa, &data);
 
+	// if_indextoname creates socket, calls ioctl, closes socket
+	// code below prevents socket() and close() syscalls on every packet
+	// this saves CPU 5-10 times
+
 	*ifr_out.ifr_name = 0;
 	ifr_out.ifr_ifindex = nfq_get_outdev(nfa);
 	if (ifr_out.ifr_ifindex && ioctl(cbdata->sock, SIOCGIFNAME, &ifr_out)<0)
