@@ -255,7 +255,6 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	size_t len;
 	struct nfqnl_msg_packet_hdr *ph;
 	uint8_t *data;
-	uint32_t ifidx_out, ifidx_in;
 	size_t modlen;
 	struct nfq_cb_data *cbdata = (struct nfq_cb_data*)cookie;
 	uint32_t mark;
@@ -268,24 +267,16 @@ static int nfq_cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg, struct nfq_da
 	ilen = nfq_get_payload(nfa, &data);
 
 	*ifr_out.ifr_name = 0;
-	ifidx_out = nfq_get_outdev(nfa);
-	if (ifidx_out)
-	{
-		ifr_out.ifr_ifindex = ifidx_out;
-		if (ioctl(cbdata->sock, SIOCGIFNAME, &ifr_out)<0)
-			DLOG_PERROR("ioctl(SIOCGIFNAME)");
-	}
+	ifr_out.ifr_ifindex = nfq_get_outdev(nfa);
+	if (ifr_out.ifr_ifindex && ioctl(cbdata->sock, SIOCGIFNAME, &ifr_out)<0)
+		DLOG_PERROR("ioctl(SIOCGIFNAME)");
 
 	*ifr_in.ifr_name = 0;
-	ifidx_in = nfq_get_indev(nfa);
-	if (ifidx_in)
-	{
-		ifr_in.ifr_ifindex = ifidx_in;
-		if (ioctl(cbdata->sock, SIOCGIFNAME, &ifr_in)<0)
-			DLOG_PERROR("ioctl(SIOCGIFNAME)");
-	}
+	ifr_in.ifr_ifindex = nfq_get_indev(nfa);
+	if (ifr_in.ifr_ifindex && ioctl(cbdata->sock, SIOCGIFNAME, &ifr_in)<0)
+		DLOG_PERROR("ioctl(SIOCGIFNAME)");
 
-	DLOG("\npacket: id=%d len=%d mark=%08X ifin=%s(%u) ifout=%s(%u)\n", id, ilen, mark, ifr_in.ifr_name, ifidx_in, ifr_out.ifr_name, ifidx_out);
+	DLOG("\npacket: id=%d len=%d mark=%08X ifin=%s(%u) ifout=%s(%u)\n", id, ilen, mark, ifr_in.ifr_name, ifr_in.ifr_ifindex, ifr_out.ifr_name, ifr_out.ifr_ifindex);
 
 	if (ilen >= 0)
 	{
@@ -408,7 +399,7 @@ static void notify_ready(void)
 }
 
 // extra space for netlink headers
-#define NFQ_MAX_RECV_SIZE (RECONSTRUCT_MAX_SIZE+512)
+#define NFQ_MAX_RECV_SIZE (RECONSTRUCT_MAX_SIZE+4096)
 static int nfq_main(void)
 {
 	struct nfq_handle *h = NULL;
