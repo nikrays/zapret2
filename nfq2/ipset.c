@@ -104,7 +104,7 @@ static bool AppendIpset(ipset *ips, const char *filename)
 	{
 		DLOG_CONDUP("loading plain text list\n");
 
-		while (fgets(s, sizeof(s)-1, F))
+		while (fgets_safe(s, sizeof(s)-1, F))
 		{
 			p = s;
 			if (!addpool(ips,&p,p+strlen(p),&ct))

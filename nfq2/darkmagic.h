@@ -94,7 +94,7 @@
 
 // returns netorder value
 uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment);
-uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
+uint16_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment);
 
 #define SCALE_NONE ((uint8_t)-1)
 

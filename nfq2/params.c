@@ -116,7 +116,7 @@ static char log_buf[4096];
 static size_t log_buf_sz=0;
 static void syslog_log_function(int priority, const char *line)
 {
-	syslog(priority,"%s",log_buf);
+	syslog(priority,"%s",line);
 }
 
 static int DLOG_FILENAME(const char *filename, const char *format, ...)
@@ -405,7 +405,7 @@ static struct desync_profile_list *desync_profile_entry_alloc()
 struct desync_profile_list *dp_list_add(struct desync_profile_list_head *head)
 {
 	struct desync_profile_list *entry = desync_profile_entry_alloc();
-	if (!entry) return false;
+	if (!entry) return NULL;
 
 	struct desync_profile_list *tail, *item;
 	LIST_TAIL(head, tail, item);

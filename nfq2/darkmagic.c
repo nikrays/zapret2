@@ -48,7 +48,7 @@ uint32_t net32_add(uint32_t netorder_value, uint32_t cpuorder_increment)
 {
 	return htonl(ntohl(netorder_value)+cpuorder_increment);
 }
-uint32_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment)
+uint16_t net16_add(uint16_t netorder_value, uint16_t cpuorder_increment)
 {
 	return htons(ntohs(netorder_value)+cpuorder_increment);
 }
@@ -229,7 +229,7 @@ uint16_t family_from_proto(uint8_t l3proto)
 	{
 		case IPPROTO_IP: return AF_INET;
 		case IPPROTO_IPV6: return AF_INET6;
-		default: return -1;
+		default: return AF_UNSPEC;
 	}
 }
 
@@ -2160,8 +2160,8 @@ static uint8_t *find_ie(uint8_t *buf, size_t len, uint8_t ie)
 	{
 		if (len<(2+buf[1])) break;
 		if (buf[0]==ie) return buf;
-		buf+=buf[1]+2;
 		len-=buf[1]+2;
+		buf+=buf[1]+2;
 	}
 	return NULL;
 }

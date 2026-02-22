@@ -96,7 +96,7 @@ function detect_payload_str(ctx, desync)
 		error("detect_payload_str: missing 'pattern'")
 	end
 	local data = desync.reasm_data or desync.dis.payload
-	local b = string.find(data,desync.arg.pattern,1,true)
+	local b = data and string.find(data,desync.arg.pattern,1,true)
 	if b then
 		DLOG("detect_payload_str: detected '"..desync.arg.payload.."'")
 		if desync.arg.payload then desync.l7payload = desync.arg.payload end
@@ -337,9 +337,8 @@ end
 
 -- convert array a to packed string using 'packer' function. only numeric indexes starting from 1, order preserved
 function barray(a, packer)
-	local sa={}
 	if a then
-		local s=""
+		local sa={}
 		for i=1,#a do
 			sa[i] = packer(a[i])
 		end
@@ -348,16 +347,16 @@ function barray(a, packer)
 end
 -- convert table a to packed string using 'packer' function. any indexes, any order
 function btable(a, packer)
-	local sa={}
 	if a then
-		local s=""
+		local sa={}
+		local i=1
 		for k,v in pairs(a) do
-			sa[k] = packer(v)
+			sa[i] = packer(v)
+			i=i+1
 		end
 		return table.concat(sa)
 	end
 end
-
 -- sequence comparision functions. they work only within 2G interval
 -- seq1>=seq2
 function seq_ge(seq1, seq2)
@@ -1619,9 +1618,9 @@ function gzip_file(filename, data, expected_ratio, level, memlevel, compress_blo
 	if not gz then
 		error("gzip_file: stream init error")
 	end
-	local off=1, block_size
+	local off=1
 	repeat
-		block_size = #data-off+1
+		local block_size = #data-off+1
 		if block_size>compress_block_size then block_size=compress_block_size end
 		local comp, eof = gzip_deflate(gz, string.sub(data,off,off+block_size-1), block_size / expected_ratio)
 		if not comp then

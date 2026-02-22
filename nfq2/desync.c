@@ -1891,7 +1891,7 @@ rediscover_cancel:
 
 	ps.verdict = desync(ps.dp, fwmark, ifin, ifout, ps.bReverseFixed, ps.ctrack_replay, tpos, ps.l7payload, ps.l7proto, dis, ps.sdip4, ps.sdip6, ps.sdport, mod_pkt, len_mod_pkt, replay_piece, replay_piece_count, reasm_offset, NULL, 0, data_decrypt, len_decrypt);
 pass:
-	return (!ps.bReverse && (ps.verdict & VERDICT_MASK) == VERDICT_DROP) ? ct_new_postnat_fix(ps.ctrack, dis, mod_pkt, len_mod_pkt) : ps.verdict;
+	return (!ps.bReverseFixed && (ps.verdict & VERDICT_MASK) == VERDICT_DROP) ? ct_new_postnat_fix(ps.ctrack, dis, mod_pkt, len_mod_pkt) : ps.verdict;
 }
 
 // conntrack is supported only for RELATED icmp

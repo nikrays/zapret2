@@ -172,9 +172,6 @@ static void ConntrackApplyPos(t_ctrack *t, bool bReverse, const struct dissect *
 
 static void ConntrackFeedPacket(t_ctrack *t, bool bReverse, const struct dissect *dis)
 {
-	uint8_t scale;
-	uint16_t mss;
-
 	if (bReverse)
 	{
 		t->pos.server.pcounter++;

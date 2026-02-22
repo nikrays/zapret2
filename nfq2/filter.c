@@ -180,7 +180,7 @@ void str_cidr4(char *s, size_t s_len, const struct cidr4 *cidr)
 }
 void print_cidr4(const struct cidr4 *cidr)
 {
-	char s[19];
+	char s[INET_ADDRSTRLEN+4];
 	str_cidr4(s,sizeof(s),cidr);
 	printf("%s",s);
 }
@@ -193,7 +193,7 @@ void str_cidr6(char *s, size_t s_len, const struct cidr6 *cidr)
 }
 void print_cidr6(const struct cidr6 *cidr)
 {
-	char s[INET_ADDRSTRLEN+4];
+	char s[INET6_ADDRSTRLEN+4];
 	str_cidr6(s,sizeof(s),cidr);
 	printf("%s",s);
 }

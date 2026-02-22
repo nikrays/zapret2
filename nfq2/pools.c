@@ -493,7 +493,6 @@ void kavl_bit_destroy(struct kavl_bit_elem **hdr)
 		if (!e)	break;
 		kavl_bit_destroy_elem(e);
 	}
-	free(*hdr);
 }
 struct kavl_bit_elem *kavl_bit_add(struct kavl_bit_elem **hdr, void *data, unsigned int bitlen, size_t struct_size)
 {
