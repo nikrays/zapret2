@@ -1445,7 +1445,7 @@ bool IsStunMessage(const uint8_t *data, size_t len)
 		(data[0]&0xC0)==0 && // 2 most significant bits must be zeroes
 		(data[3]&3)==0 && // length must be a multiple of 4
 		pntoh32(data+4)==0x2112A442 && // magic cookie
-		pntoh16(data+2)==(len-20);
+		pntoh16(data+2)<=(len-20);
 }
 #if defined(__GNUC__) && !defined(__llvm__)
 __attribute__((optimize ("no-strict-aliasing")))
@@ -1460,7 +1460,7 @@ bool IsMTProto(const uint8_t *data, size_t len)
 		return !memcmp(decrypt+56,"\xEF\xEF\xEF\xEF",4);
 */
 		// this way requires only one AES instead of 4
-		uint8_t decrypt[16] __attribute__((aligned)), iv[16];
+		uint8_t decrypt[16] __attribute__((aligned(16))), iv[16] __attribute__((aligned(16)));
 		aes_context ctx;
 
 		memcpy(iv, data+40, 16);

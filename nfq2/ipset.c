@@ -11,7 +11,9 @@ static bool addpool(ipset *ips, char **s, const char *end, int *ct)
 	struct cidr4 c4;
 	struct cidr6 c6;
 
-	for (p=*s; p<end && *p && *p!=' ' && *p!='\t' && *p!='\r' && *p != '\n'; p++);
+	for (p=*s; p<end && (*p==' ' || *p=='\t') ; p++);
+	*s=p;
+	for (; p<end && *p && *p!=' ' && *p!='\t' && *p!='\r' && *p != '\n'; p++);
 
 	// comment line
 	if (!(**s == '#' || **s == ';' || **s == '/' || **s == '\r' || **s == '\n' ))

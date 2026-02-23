@@ -8,6 +8,8 @@ static bool addpool(hostlist_pool **hostlist, char **s, const char *end, int *ct
 {
 	char *p=*s;
 
+	for (; p<end && (*p==' ' || *p=='\t') ; p++);
+	*s = p;
 	// comment line ?
 	if ( *p != '#' && *p != ';' && *p != '/' && *p != '\r' && *p != '\n')
 	{
