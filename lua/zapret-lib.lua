@@ -875,7 +875,11 @@ function apply_fooling(desync, dis, fooling_options)
 				if type(desync.track.lua_state.autottl_cache)~="table" then desync.track.lua_state.autottl_cache={} end
 				if type(desync.track.lua_state.autottl_cache[desync.func_instance])~="table" then desync.track.lua_state.autottl_cache[desync.func_instance]={} end
 				if not desync.track.lua_state.autottl_cache[desync.func_instance].autottl_found then
-					desync.track.lua_state.autottl_cache[desync.func_instance].autottl = autottl(desync.track.incoming_ttl,parse_autottl(arg_autottl))
+					attl = parse_autottl(arg_autottl)
+					if not attl then
+						error("apply_fooling: invalid autottl value '"..arg_autottl.."'")
+					end
+					desync.track.lua_state.autottl_cache[desync.func_instance].autottl = autottl(desync.track.incoming_ttl,attl)
 					if desync.track.lua_state.autottl_cache[desync.func_instance].autottl then
 						desync.track.lua_state.autottl_cache[desync.func_instance].autottl_found = true
 							DLOG("apply_fooling: discovered autottl "..desync.track.lua_state.autottl_cache[desync.func_instance].autottl)
@@ -890,8 +894,11 @@ function apply_fooling(desync, dis, fooling_options)
 				DLOG("apply_fooling: cannot apply autottl because incoming ttl unknown")
 			end
 		end
-		if not ttl and tonumber(arg_ttl) then
+		if not ttl and arg_ttl then
 			ttl = tonumber(arg_ttl)
+			if not ttl or ttl<0 or ttl>255 then
+				error("apply_fooling: ip_ttl and ip6_ttl require valid value")
+			end
 		end
 		--io.stderr:write("TTL "..tostring(ttl).."\n")
 		return ttl
@@ -908,11 +915,19 @@ function apply_fooling(desync, dis, fooling_options)
 	-- use current packet if dissect not given
 	if not dis then dis = desync.dis end
 	if dis.tcp then
-		if tonumber(fooling_options.tcp_seq) then
-			dis.tcp.th_seq = u32add(dis.tcp.th_seq, fooling_options.tcp_seq)
+		if fooling_options.tcp_seq then
+			if tonumber(fooling_options.tcp_seq) then
+				dis.tcp.th_seq = u32add(dis.tcp.th_seq, fooling_options.tcp_seq)
+			else
+				error("apply_fooling: tcp_seq requires increment parameter. there's no default value.")
+			end
 		end
-		if tonumber(fooling_options.tcp_ack) then
-			dis.tcp.th_ack = u32add(dis.tcp.th_ack, fooling_options.tcp_ack)
+		if fooling_options.tcp_ack then
+			if tonumber(fooling_options.tcp_ack) then
+				dis.tcp.th_ack = u32add(dis.tcp.th_ack, fooling_options.tcp_ack)
+			else
+				error("apply_fooling: tcp_ack requires increment parameter. there's no default value.")
+			end
 		end
 		if fooling_options.tcp_flags_unset then
 			dis.tcp.th_flags = bitand(dis.tcp.th_flags, bitnot(parse_tcp_flags(fooling_options.tcp_flags_unset)))
@@ -927,12 +942,16 @@ function apply_fooling(desync, dis, fooling_options)
 				end
 			end
 		end
-		if tonumber(fooling_options.tcp_ts) then
-			local idx = find_tcp_option(dis.tcp.options,TCP_KIND_TS)
-			if idx and (dis.tcp.options[idx].data and #dis.tcp.options[idx].data or 0)==8 then
-				dis.tcp.options[idx].data = bu32(u32add(u32(dis.tcp.options[idx].data),fooling_options.tcp_ts))..string.sub(dis.tcp.options[idx].data,5)
+		if fooling_options.tcp_ts then
+			if tonumber(fooling_options.tcp_ts) then
+				local idx = find_tcp_option(dis.tcp.options,TCP_KIND_TS)
+				if idx and (dis.tcp.options[idx].data and #dis.tcp.options[idx].data or 0)==8 then
+					dis.tcp.options[idx].data = bu32(u32add(u32(dis.tcp.options[idx].data),fooling_options.tcp_ts))..string.sub(dis.tcp.options[idx].data,5)
+				else
+					DLOG("apply_fooling: timestamp tcp option not present or invalid")
+				end
 			else
-				DLOG("apply_fooling: timestamp tcp option not present or invalid")
+				error("apply_fooling: tcp_ts requires increment parameter. there's no default value.")
 			end
 		end
 		if fooling_options.tcp_md5 then
