@@ -89,9 +89,10 @@ dl_deps
 check_toolchains
 ask_target
 
-CFLAGS="$CFLAGS $CFLAGS_PIC"
+CFLAGS_BASE="$CFLAGS"
 for t in $TGT; do
 	buildenv $t
+        CFLAGS="$CFLAGS_BASE $CFLAGS_PIC"
 	pushd "$DEPS"
 	install_h_files
 	build_netlink

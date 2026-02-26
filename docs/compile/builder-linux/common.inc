@@ -5,11 +5,13 @@ TOOLCHAINS="$EXEDIR/toolchain"
 DEPS="$EXEDIR/deps"
 STAGE="$EXEDIR/staging"
 OPTIMIZE=${OPTIMIZE:--Oz}
-MINSIZE="${MINSIZE:--flto=auto -ffunction-sections -fdata-sections}"
+#MINSIZE="${MINSIZE:--flto=auto -ffunction-sections -fdata-sections}"
+MINSIZE="${MINSIZE:--ffunction-sections -fdata-sections}"
 LDMINSIZE="${LDMINSIZE:--Wl,--gc-sections -flto=auto}"
 #CFLAGS=""
 LDFLAGS="-lgcc_eh $LDFLAGS"
 # PIE makes ASLR working but adds 5% to size
+# PIE does not work for arm32 and all mips
 PIE=${PIE:-0}
 HOSTCC=${HOSTCC:-cc}
 LUA_VER=${LUA_VER:-5.5}
@@ -18,13 +20,6 @@ LUAJIT_VER=${LUAJIT_VER:-2.1}
 LUAJIT_RELEASE=${LUAJIT_RELEASE:-2.1-20250826}
 LUAJIT_LUA_VER=${LUAJIT_LUA_VER:-5.1}
 nproc=$(nproc)
-
-CFLAGS_PIC=
-LDFLAGS_PIE=-static
-[ "$PIE" = 1 ] && {
-	CFLAGS_PIC=-fPIC
-	LDFLAGS_PIE=-static-pie
-}
 
 TARGETS="\
 aarch64-unknown-linux-musl \
@@ -98,7 +93,20 @@ buildenv()
 	export PKG_CONFIG_PATH=$STAGING_DIR/lib/pkgconfig
 	OLDPATH="$PATH"
 	export PATH="$PATH:$TOOLCHAINS/$TARGET/bin"
+
+	CFLAGS_PIC=
+	LDFLAGS_PIE=-static
+	# not all archs support -static-pie. if does not support - it produces dynamic executable
+	# "-static -static-pie" causes segfaults
+	[ "$PIE" = 1 ] && case $1 in
+		arm-*|mips*)
+			;;
+		*)
+			CFLAGS_PIC=-fPIC
+			LDFLAGS_PIE="-static-pie"
+	esac
 }
+
 buildenv_clear()
 {
 	export PATH="$OLDPATH" TARGET= CC= LD= AR= NM= STRIP= STAGING_DIR= PKG_CONFIG_PATH=
