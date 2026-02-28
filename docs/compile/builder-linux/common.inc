@@ -94,13 +94,15 @@ buildenv()
 	OLDPATH="$PATH"
 	export PATH="$PATH:$TOOLCHAINS/$TARGET/bin"
 
+	CPU=
 	CFLAGS_PIC=
 	LDFLAGS_PIE=-static
 	# not all archs support -static-pie. if does not support - it produces dynamic executable
 	# "-static -static-pie" causes segfaults
 	case $1 in
 		arm-*)
-			CFLAGS="-march=armv7-a -mthumb $CFLAGS"
+			CPU="-mcpu=cortex-a7 -mthumb -msoft-float $CFLAGS"
+			CFLAGS="$CPU $CFLAGS"
 			;;
 		mips*)
 			;;
