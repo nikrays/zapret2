@@ -38,7 +38,7 @@ ask_target
 
 CFLAGS_BASE="$CFLAGS"
 for t in $TGT; do
-        CFLAGS="$CFLAGS_BASE $MINSIZE $CFLAGS_PIC"
+        CFLAGS="$CFLAGS_BASE $MINSIZE"
 	buildenv $t
 
 	translate_target $t || {
@@ -50,7 +50,7 @@ for t in $TGT; do
 
 	make clean
 	OPTIMIZE=$OPTIMIZE \
-	CFLAGS="-static-libgcc -I$STAGING_DIR/include $CFLAGS" \
+	CFLAGS="-static-libgcc -I$STAGING_DIR/include $CFLAGS $CFLAGS_PIC" \
 	LDFLAGS="-L$STAGING_DIR/lib $LDMINSIZE $LDFLAGS_PIE $LDFLAGS" \
 	make
 
