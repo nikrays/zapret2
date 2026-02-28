@@ -105,7 +105,7 @@ jobs:
               OPTIMIZE=-Os
               ;;
             arm)
-              CFL="-march=armv7-a -mthumb"
+              CPU="-mcpu=cortex-a7 -mthumb"
               ;;
           esac
           MINSIZE="$OPTIMIZE $MINSIZE"
@@ -115,7 +115,7 @@ jobs:
             wget -qO- https://www.lua.org/ftp/lua-${LUA_RELEASE}.tar.gz | tar -xz
             (
               cd lua-${LUA_RELEASE}
-              make CC=$CC AR="$AR rc" CFLAGS="$CFL $MINSIZE $CFLAGS" LDFLAGS="$LDMINSIZE $LDFLAGS" linux -j$(nproc)
+              make CC=$CC AR="$AR rc" CFLAGS="$CPU $MINSIZE $CFLAGS" LDFLAGS="$LDMINSIZE $LDFLAGS" linux -j$(nproc)
               make install INSTALL_TOP=$DEPS_DIR INSTALL_BIN=$DEPS_DIR/bin INSTALL_INC=$DEPS_DIR/include/lua${LUA_VER} INSTALL_LIB=$DEPS_DIR/lib
             )
             LJIT=0
@@ -133,7 +133,7 @@ jobs:
             esac
             (
               cd luajit2-*
-              make BUILDMODE=static XCFLAGS="-DLUAJIT_DISABLE_FFI" HOST_CC="$HOSTCC" CROSS= CC="$CC" TARGET_AR="$AR rcus" TARGET_STRIP=$STRIP TARGET_CFLAGS="$MINSIZE $CFLAGS" TARGET_LDFLAGS="$LDMINSIZE $LDFLAGS" -j$(nproc)
+              make BUILDMODE=static XCFLAGS="-DLUAJIT_DISABLE_FFI" HOST_CC="$HOSTCC" CROSS= CC="$CC" TARGET_AR="$AR rcus" TARGET_STRIP=$STRIP TARGET_CFLAGS="$CPU $MINSIZE $CFLAGS" TARGET_LDFLAGS="$CPU $LDMINSIZE $LDFLAGS" -j$(nproc)
               make install PREFIX= DESTDIR=$DEPS_DIR
             )
             LJIT=1
@@ -149,7 +149,7 @@ jobs:
           for i in libmnl libnfnetlink libnetfilter_queue ; do
             (
               cd $i-*
-              CFLAGS="$CFL $MINSIZE $CFLAGS" \
+              CFLAGS="$CPU $MINSIZE $CFLAGS" \
               LDFLAGS="$LDMINSIZE $LDFLAGS" \
               ./configure --prefix= --host=$TARGET --enable-static --disable-shared --disable-dependency-tracking
               make install -j$(nproc) DESTDIR=$DEPS_DIR
@@ -162,7 +162,7 @@ jobs:
             xargs -I{} wget -qO- https://github.com/madler/zlib/archive/refs/tags/{}.tar.gz | tar -xz
           (
             cd zlib-*
-            CFLAGS="$CFL $MINSIZE $CFLAGS" \
+            CFLAGS="$CPU $MINSIZE $CFLAGS" \
             ./configure --prefix= --static
             make install -j$(nproc) DESTDIR=$DEPS_DIR
           )
@@ -174,7 +174,7 @@ jobs:
 
           # zapret2
           OPTIMIZE=$OPTIMIZE \
-          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -I$DEPS_DIR/include $CFL $CFLAGS" \
+          CFLAGS="-DZAPRET_GH_VER=${{ github.ref_name }} -DZAPRET_GH_HASH=${{ github.sha }} -static-libgcc -I$DEPS_DIR/include $CPU $CFLAGS" \
           LDFLAGS="-L$DEPS_DIR/lib $LDFLAGS" \
           make -C zapret2 CFLAGS_PIC= LDFLAGS_PIE=-static LUA_JIT=$LJIT LUA_CFLAGS="$LCFLAGS" LUA_LIB="$LLIB" -j$(nproc)
 
