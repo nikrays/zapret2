@@ -91,8 +91,8 @@ ask_target
 
 CFLAGS_BASE="$CFLAGS"
 for t in $TGT; do
-	buildenv $t
         CFLAGS="$CFLAGS_BASE $CFLAGS_PIC"
+	buildenv $t
 	pushd "$DEPS"
 	install_h_files
 	build_netlink

@@ -98,12 +98,17 @@ buildenv()
 	LDFLAGS_PIE=-static
 	# not all archs support -static-pie. if does not support - it produces dynamic executable
 	# "-static -static-pie" causes segfaults
-	[ "$PIE" = 1 ] && case $1 in
-		arm-*|mips*)
+	case $1 in
+		arm-*)
+			CFLAGS="-march=armv7-a -mthumb $CFLAGS"
+			;;
+		mips*)
 			;;
 		*)
-			CFLAGS_PIC=-fPIC
-			LDFLAGS_PIE="-static-pie"
+			[ "$PIE" = 1 ] && {
+				CFLAGS_PIC=-fPIC
+				LDFLAGS_PIE="-static-pie"
+			}
 	esac
 }
 

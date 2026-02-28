@@ -36,7 +36,9 @@ ask_target
 
 [ -d "$ZBIN" ] || mkdir -p "$ZBIN"
 
+CFLAGS_BASE="$CFLAGS"
 for t in $TGT; do
+        CFLAGS="$CFLAGS_BASE"
 	buildenv $t
 
 	translate_target $t || {
