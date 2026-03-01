@@ -133,7 +133,7 @@ jobs:
             esac
             (
               cd luajit2-*
-              make BUILDMODE=static XCFLAGS="-DLUAJIT_DISABLE_FFI" HOST_CC="$HOSTCC" CROSS= CC="$CC" TARGET_AR="$AR rcus" TARGET_STRIP=$STRIP TARGET_CFLAGS="$CPU $MINSIZE $CFLAGS" TARGET_LDFLAGS="$CPU $LDMINSIZE $LDFLAGS" -j$(nproc)
+              make BUILDMODE=static XCFLAGS="-DLUAJIT_USE_SYSMALLOC -DLUAJIT_DISABLE_FFI" HOST_CC="$HOSTCC" CROSS= CC="$CC" TARGET_AR="$AR rcus" TARGET_STRIP=$STRIP TARGET_CFLAGS="$CPU $MINSIZE $CFLAGS" TARGET_LDFLAGS="$CPU $LDMINSIZE $LDFLAGS" -j$(nproc)
               make install PREFIX= DESTDIR=$DEPS_DIR
             )
             LJIT=1
