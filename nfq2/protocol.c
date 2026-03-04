@@ -1309,12 +1309,13 @@ bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,siz
 			// remove exact duplicates early to save cpu
 			for(i=0;i<range;i++)
 				if (ranges[i].offset==offset && ranges[i].len==sz)
-					continue;
+					goto endloop;
 
 			ranges[range].offset = offset;
 			ranges[range].len = sz;
 			range++;
 		}
+endloop:
 	}
 	if (found)
 	{
@@ -1372,6 +1373,8 @@ bool IsQUICInitial(const uint8_t *data, size_t len)
 	// DCID
 	if (data[offset] > QUIC_MAX_CID_LENGTH) return false;
 	offset += 1 + data[offset];
+
+	if (offset>=len) return false;
 
 	// SCID
 	if (data[offset] > QUIC_MAX_CID_LENGTH) return false;
