@@ -273,3 +273,6 @@ v0.9.4.3
 * github: use 16K page size for android arm64 build
 * nfqws2: join fragments in quic CRYPTO reconstruction. allow intersections.
 
+0.9.4.6
+
+* nfqws2: fix TLS payload reassemble if L7 protocol is not TLS

@@ -80,6 +80,7 @@ typedef struct
 	int lua_state;				// registry index of associated LUA object
 	int lua_instance_cutoff;		// registry index of per connection function instance cutoff table
 
+	t_l7payload reasm_client_payload;	// payload type being reassembled
 	t_reassemble reasm_client;
 	struct rawpacket_tailhead delayed;
 } t_ctrack;

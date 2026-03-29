@@ -528,7 +528,7 @@ static bool send_delayed(t_ctrack *ctrack)
 	return true;
 }
 
-static bool reasm_start(t_ctrack *ctrack, t_reassemble *reasm, uint8_t proto, uint32_t seq, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
+static bool reasm_start(t_reassemble *reasm, uint8_t proto, uint32_t seq, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
 {
 	ReasmClear(reasm);
 	if (sz <= szMax)
@@ -546,7 +546,7 @@ static bool reasm_start(t_ctrack *ctrack, t_reassemble *reasm, uint8_t proto, ui
 		DLOG("unexpected large payload for reassemble: size=%zu\n", sz);
 	return false;
 }
-static bool reasm_client_start(t_ctrack *ctrack, uint8_t proto, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
+static bool reasm_client_start(t_ctrack *ctrack, uint8_t proto, t_l7payload pl, size_t sz, size_t szMax, const uint8_t *data_payload, size_t len_payload)
 {
 	if (!ctrack) return false;
 	// if pcounter==0 it means we dont know server window size - no incoming packets redirected ?
@@ -559,7 +559,8 @@ static bool reasm_client_start(t_ctrack *ctrack, uint8_t proto, size_t sz, size_
 		DLOG("reasm cancelled because server window size %u is smaller than expected reasm size %zu\n", ctrack->pos.server.winsize_calc, sz);
 		return false;
 	}
-	return reasm_start(ctrack, &ctrack->reasm_client, proto, (proto == IPPROTO_TCP) ? ctrack->pos.client.seq_last : 0, sz, szMax, data_payload, len_payload);
+	ctrack->reasm_client_payload = pl;
+	return reasm_start(&ctrack->reasm_client, proto, (proto == IPPROTO_TCP) ? ctrack->pos.client.seq_last : 0, sz, szMax, data_payload, len_payload);
 }
 static bool reasm_feed(t_ctrack *ctrack, t_reassemble *reasm, uint8_t proto, uint32_t seq, const uint8_t *data_payload, size_t len_payload)
 {
@@ -592,6 +593,7 @@ static void reasm_client_stop(t_ctrack *ctrack, const char *dlog_msg)
 		{
 			DLOG("%s", dlog_msg);
 			ReasmClear(&ctrack->reasm_client);
+			ctrack->reasm_client_payload = L7P_UNKNOWN;
 		}
 		send_delayed(ctrack);
 	}
@@ -1554,12 +1556,11 @@ static uint8_t dpi_desync_tcp_packet_play(
 				}
 			}
 		}
-
 		if (ps.l7payload==L7P_HTTP_REQ)
 		{
 			ps.bHaveHost = HttpExtractHost(rdata_payload, rlen_payload, ps.host, sizeof(ps.host));
 		}
-		else if (ps.l7payload==L7P_TLS_CLIENT_HELLO || ps.l7proto==L7_TLS && ps.l7payload==L7P_UNKNOWN && ps.ctrack_replay && !ReasmIsEmpty(&ps.ctrack_replay->reasm_client))
+		else if (ps.l7payload==L7P_TLS_CLIENT_HELLO || ps.ctrack_replay && ps.ctrack_replay->reasm_client_payload==L7P_TLS_CLIENT_HELLO && !ReasmIsEmpty(&ps.ctrack_replay->reasm_client))
 		{
 			ps.l7payload = L7P_TLS_CLIENT_HELLO;
 
@@ -1575,7 +1576,7 @@ static uint8_t dpi_desync_tcp_packet_play(
 				{
 					// do not reconstruct unexpected large payload (they are feeding garbage ?)
 					// also do not reconstruct if server window size is low
-					if (!reasm_client_start(ps.ctrack, IPPROTO_TCP, TLSRecordLen(dis->data_payload), TCP_MAX_REASM, dis->data_payload, dis->len_payload))
+					if (!reasm_client_start(ps.ctrack, IPPROTO_TCP, L7P_TLS_CLIENT_HELLO, TLSRecordLen(dis->data_payload), TCP_MAX_REASM, dis->data_payload, dis->len_payload))
 						goto rediscover;
 				}
 
@@ -1600,6 +1601,8 @@ static uint8_t dpi_desync_tcp_packet_play(
 			}
 			ps.bHaveHost = TLSHelloExtractHost(rdata_payload, rlen_payload, ps.host, sizeof(ps.host), true);
 		}
+		else
+			reasm_client_cancel(ps.ctrack);
 	}
 
 // UNSOLVED: if reasm is cancelled all packets except the last are passed as is without lua desync
@@ -1857,7 +1860,7 @@ static uint8_t dpi_desync_udp_packet_play(
 								if (bIsHello && !bReqFull && ReasmIsEmpty(&ps.ctrack->reasm_client))
 								{
 									// preallocate max buffer to avoid reallocs that cause memory copy
-									if (!reasm_client_start(ps.ctrack, IPPROTO_UDP, UDP_MAX_REASM, UDP_MAX_REASM, clean, clean_len))
+									if (!reasm_client_start(ps.ctrack, IPPROTO_UDP, L7P_QUIC_INITIAL, UDP_MAX_REASM, UDP_MAX_REASM, clean, clean_len))
 										goto rediscover_cancel;
 								}
 								if (!ReasmIsEmpty(&ps.ctrack->reasm_client))
@@ -1899,7 +1902,7 @@ static uint8_t dpi_desync_udp_packet_play(
 								if (ReasmIsEmpty(&ps.ctrack->reasm_client))
 								{
 									// preallocate max buffer to avoid reallocs that cause memory copy
-									if (!reasm_client_start(ps.ctrack, IPPROTO_UDP, UDP_MAX_REASM, UDP_MAX_REASM, clean, clean_len))
+									if (!reasm_client_start(ps.ctrack, IPPROTO_UDP, L7P_QUIC_INITIAL, UDP_MAX_REASM, UDP_MAX_REASM, clean, clean_len))
 										goto rediscover_cancel;
 								}
 								if (rawpacket_queue(&ps.ctrack->delayed, &ps.dst, fwmark, desync_fwmark, ifin, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload, &ps.ctrack->pos, false))
