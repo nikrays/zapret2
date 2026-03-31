@@ -774,7 +774,6 @@ bool TLSMod_parse_list(const char *modlist, struct fake_tls_mod *tls_mod)
 // payload is related to received tls client hello
 bool TLSMod(const struct fake_tls_mod *tls_mod, const uint8_t *payload, size_t payload_len, uint8_t *fake_tls, size_t *fake_tls_size, size_t fake_tls_buf_size)
 {
-	bool bRes = true;
 	const uint8_t *ext;
 	size_t extlen,slen,extlen_offset=0,padlen_offset=0;
 
@@ -787,7 +786,7 @@ bool TLSMod(const struct fake_tls_mod *tls_mod, const uint8_t *payload, size_t p
 	{
 		if (!TLSFindExtLen(fake_tls, *fake_tls_size, &extlen_offset))
 		{
-			DLOG_ERR("cannot apply tls mod.tls structure invalid\n");
+			DLOG_ERR("cannot apply tls mod. tls structure invalid\n");
 			return false;
 		}
 		DLOG("tls extensions length offset : %zu\n", extlen_offset);
@@ -840,8 +839,7 @@ bool TLSMod(const struct fake_tls_mod *tls_mod, const uint8_t *payload, size_t p
 		{
 			if (!slen)
 			{
-				DLOG_ERR("cannot apply rndsni tls mod. tls has zero sized SNI\n");
-				bRes = false;
+				DLOG_ERR("(nonfatal) cannot apply rndsni tls mod. tls has zero sized SNI\n");
 			}
 			else
 			{
@@ -887,20 +885,11 @@ bool TLSMod(const struct fake_tls_mod *tls_mod, const uint8_t *payload, size_t p
 			if (IsTLSClientHelloPartial(payload, payload_len))
 			{
 				if (payload_len < 44)
-				{
-					DLOG("cannot apply dupsid tls mod. data payload is too short.\n");
-					bRes = false;
-				}
+					DLOG("(nonfatal) cannot apply dupsid tls mod. data payload is too short.\n");
 				else if (fake_tls[43] != payload[43])
-				{
-					DLOG("cannot apply dupsid tls mod. fake and orig session id length mismatch : %u!=%u.\n", fake_tls[43], payload[43]);
-					bRes = false;
-				}
+					DLOG("(nonfatal) cannot apply dupsid tls mod. fake and orig session id length mismatch : %u!=%u.\n", fake_tls[43], payload[43]);
 				else if (payload_len < (44 + payload[43]))
-				{
-					DLOG("cannot apply dupsid tls mod. data payload is not valid.\n");
-					bRes = false;
-				}
+					DLOG("(nonfatal) cannot apply dupsid tls mod. data payload is not valid.\n");
 				else
 				{
 					memcpy(fake_tls + 44, payload + 44, fake_tls[43]); // session id
@@ -909,8 +898,7 @@ bool TLSMod(const struct fake_tls_mod *tls_mod, const uint8_t *payload, size_t p
 			}
 			else
 			{
-				DLOG_ERR("cannot apply dupsid tls mod. payload is not valid tls.\n");
-				bRes = false;
+				DLOG_ERR("(nonfatal) cannot apply dupsid tls mod. payload is not valid tls.\n");
 			}
 		}
 		if (tls_mod->mod & FAKE_TLS_MOD_PADENCAP)
@@ -948,8 +936,7 @@ bool TLSMod(const struct fake_tls_mod *tls_mod, const uint8_t *payload, size_t p
 			size_t sz_pad = pntoh16(fake_tls + padlen_offset) + payload_len;
 			if ((sz_rec & ~0xFFFF) || (sz_handshake & ~0xFFFFFF) || (sz_ext & ~0xFFFF) || (sz_pad & ~0xFFFF))
 			{
-				DLOG("cannot apply padencap tls mod. length overflow.\n");
-				bRes = false;
+				DLOG("(nonfatal) cannot apply padencap tls mod. length overflow.\n");
 			}
 			else
 			{
@@ -962,7 +949,7 @@ bool TLSMod(const struct fake_tls_mod *tls_mod, const uint8_t *payload, size_t p
 		}
 	}
 	
-	return bRes;
+	return true;
 }
 
 

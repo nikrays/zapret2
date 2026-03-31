@@ -276,3 +276,7 @@ v0.9.4.3
 0.9.4.6
 
 * nfqws2: fix TLS payload reassemble if L7 protocol is not TLS
+
+0.9.4.7
+
+* nfqws2: do not fail tls_mod if dupsid,rndsni,padencap fail
