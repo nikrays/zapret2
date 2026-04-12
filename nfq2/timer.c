@@ -96,13 +96,13 @@ void TimerPoolRun(timer_pool **pp, uint64_t bt)
 			del = NULL;
 			if (!TimerPoolRunTimer(elem))
 				del = "timer: '%s' deleted because of error\n";
-			else if (elem->oneshot)
-				del = "timer: '%s' deleted because of oneshot\n";
 
 			// timer function could delete the timer or recreate with the same name
 			p = TimerPoolSearch(*pp, name);
 			if (p==elem && p->n==n)
 			{
+				if (!del && elem->oneshot)
+					del = "timer: '%s' deleted because of oneshot\n";
 				// elem is valid, not deleted and not recreated
 				if (del)
 				{
